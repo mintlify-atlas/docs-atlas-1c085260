@@ -1,0 +1,401 @@
+---
+title: "Word Alignment & Synchronization"
+description: "Understanding character-level alignment and how transcripts are composed from alignment data"
+---
+
+The transcript viewer system uses character-level alignment data from the ElevenLabs Speech-to-Text API to synchronize text with audio playback at the word level.
+
+## Character Alignment Model
+
+The `CharacterAlignmentResponseModel` from the ElevenLabs SDK contains character-by-character timing information:
+
+```tsx
+type CharacterAlignmentResponseModel = {
+  characters: string[];
+  characterStartTimesSeconds: number[];
+  characterEndTimesSeconds: number[];
+};
+```
+
+### Structure
+
+<ParamField path="characters" type="string[]">
+  Array of individual characters from the transcript, including:
+  - Letters and numbers
+  - Whitespace (spaces, tabs, newlines)
+  - Punctuation marks
+  - Audio tags (e.g., `[`, `music`, `]`)
+</ParamField>
+
+<ParamField path="characterStartTimesSeconds" type="number[]">
+  Start time in seconds for each character. Array indices correspond to the `characters` array.
+</ParamField>
+
+<ParamField path="characterEndTimesSeconds" type="number[]">
+  End time in seconds for each character. Array indices correspond to the `characters` array.
+</ParamField>
+
+### Example Alignment Data
+
+```json
+{
+  "characters": ["H", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"],
+  "characterStartTimesSeconds": [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50],
+  "characterEndTimesSeconds": [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55]
+}
+```
+
+## Segment Composition
+
+The `composeSegments` function converts character-level alignment into word-level segments.
+
+### Segment Types
+
+```tsx
+type TranscriptSegment = TranscriptWord | GapSegment;
+
+type TranscriptWord = {
+  kind: "word";
+  segmentIndex: number;  // Position in segments array
+  wordIndex: number;     // Position in words-only array
+  text: string;          // The word text
+  startTime: number;     // Start time in seconds
+  endTime: number;       // End time in seconds
+};
+
+type GapSegment = {
+  kind: "gap";
+  segmentIndex: number;  // Position in segments array
+  text: string;          // Whitespace/punctuation
+};
+```
+
+### Composition Algorithm
+
+The composition process (`segment-composer.ts:9-100`):
+
+1. **Character Iteration** - Process each character sequentially
+2. **Word Building** - Accumulate non-whitespace characters into words
+3. **Time Tracking** - Track start time of first character and end time of last character
+4. **Gap Handling** - Separate whitespace and punctuation into gap segments
+5. **Audio Tag Filtering** - Optionally remove `[audio tags]` from output
+
+```tsx
+function composeSegments(
+  alignment: CharacterAlignmentResponseModel,
+  options: { hideAudioTags?: boolean } = {}
+): ComposeSegmentsResult {
+  const { characters, characterStartTimesSeconds, characterEndTimesSeconds } = alignment;
+  const segments: TranscriptSegment[] = [];
+  const words: TranscriptWord[] = [];
+
+  let wordBuffer = "";
+  let whitespaceBuffer = "";
+  let wordStart = 0;
+  let wordEnd = 0;
+  let segmentIndex = 0;
+  let wordIndex = 0;
+  let insideAudioTag = false;
+
+  for (let i = 0; i < characters.length; i++) {
+    const char = characters[i];
+    const start = characterStartTimesSeconds[i] ?? 0;
+    const end = characterEndTimesSeconds[i] ?? start;
+
+    // Handle audio tag filtering
+    if (options.hideAudioTags) {
+      if (char === "[") {
+        flushWord();
+        insideAudioTag = true;
+        continue;
+      }
+      if (insideAudioTag) {
+        if (char === "]") insideAudioTag = false;
+        continue;
+      }
+    }
+
+    // Handle whitespace
+    if (/\s/.test(char)) {
+      flushWord();
+      whitespaceBuffer += char;
+      continue;
+    }
+
+    // Build word
+    if (!wordBuffer) {
+      wordStart = start;
+    }
+    wordBuffer += char;
+    wordEnd = end;
+  }
+
+  return { segments, words };
+}
+```
+
+### Example Output
+
+Input alignment for "Hello [music] world":
+
+```tsx
+const alignment = {
+  characters: ["H", "e", "l", "l", "o", " ", "[", "m", "u", "s", "i", "c", "]", " ", "w", "o", "r", "l", "d"],
+  characterStartTimesSeconds: [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, ...],
+  characterEndTimesSeconds: [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, ...]
+};
+```
+
+Output with `hideAudioTags: true`:
+
+```tsx
+{
+  segments: [
+    { kind: "word", segmentIndex: 0, wordIndex: 0, text: "Hello", startTime: 0.0, endTime: 0.25 },
+    { kind: "gap", segmentIndex: 1, text: " " },
+    { kind: "word", segmentIndex: 2, wordIndex: 1, text: "world", startTime: 0.70, endTime: 0.95 }
+  ],
+  words: [
+    { kind: "word", segmentIndex: 0, wordIndex: 0, text: "Hello", startTime: 0.0, endTime: 0.25 },
+    { kind: "word", segmentIndex: 2, wordIndex: 1, text: "world", startTime: 0.70, endTime: 0.95 }
+  ]
+}
+```
+
+## Word Index Search
+
+The `findWordIndex` function uses binary search to efficiently find the word at a given time.
+
+### Algorithm
+
+From `word-index.ts:3-23`:
+
+```tsx
+function findWordIndex(words: TranscriptWord[], time: number): number {
+  if (!words.length) return -1;
+  
+  let lo = 0;
+  let hi = words.length - 1;
+  let answer = -1;
+  
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const word = words[mid];
+    
+    // Check if time falls within this word's range
+    if (time >= word.startTime && time < word.endTime) {
+      answer = mid;
+      break;
+    }
+    
+    // Binary search logic
+    if (time < word.startTime) {
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  
+  return answer;
+}
+```
+
+### Time Complexity
+
+- **Binary Search**: O(log n) where n is the number of words
+- **Linear Search**: O(n) - avoided for better performance
+
+For a transcript with 1000 words:
+- Binary search: ~10 comparisons
+- Linear search: up to 1000 comparisons
+
+### Edge Cases
+
+```tsx
+// Empty words array
+findWordIndex([], 5.0); // Returns -1
+
+// Time before first word
+findWordIndex(words, -1.0); // Returns -1
+
+// Time after last word
+findWordIndex(words, 999.0); // Returns -1
+
+// Time in gap between words
+findWordIndex(words, 2.5); // Returns -1 if no word covers this time
+
+// Time exactly at word start
+findWordIndex(words, word.startTime); // Returns word index
+
+// Time exactly at word end
+findWordIndex(words, word.endTime); // Returns -1 (uses < not <=)
+```
+
+## Custom Segment Composition
+
+You can provide a custom `segmentComposer` function to modify how segments are created:
+
+```tsx
+type SegmentComposer = (
+  alignment: CharacterAlignmentResponseModel
+) => ComposeSegmentsResult;
+
+type ComposeSegmentsResult = {
+  segments: TranscriptSegment[];
+  words: TranscriptWord[];
+};
+```
+
+### Example: Sentence-Level Segments
+
+```tsx
+function composeSentences(
+  alignment: CharacterAlignmentResponseModel
+): ComposeSegmentsResult {
+  // First get words using default composer
+  const { words } = composeSegments(alignment, { hideAudioTags: true });
+  
+  const segments: TranscriptSegment[] = [];
+  let currentSentence: TranscriptWord[] = [];
+  let segmentIndex = 0;
+  
+  for (const word of words) {
+    currentSentence.push(word);
+    
+    // End sentence on punctuation
+    if (/[.!?]$/.test(word.text)) {
+      const sentence: TranscriptWord = {
+        kind: "word",
+        segmentIndex: segmentIndex++,
+        wordIndex: segments.length,
+        text: currentSentence.map(w => w.text).join(" "),
+        startTime: currentSentence[0].startTime,
+        endTime: word.endTime,
+      };
+      segments.push(sentence);
+      currentSentence = [];
+    }
+  }
+  
+  // Handle remaining words
+  if (currentSentence.length) {
+    const sentence: TranscriptWord = {
+      kind: "word",
+      segmentIndex: segmentIndex++,
+      wordIndex: segments.length,
+      text: currentSentence.map(w => w.text).join(" "),
+      startTime: currentSentence[0].startTime,
+      endTime: currentSentence[currentSentence.length - 1].endTime,
+    };
+    segments.push(sentence);
+  }
+  
+  return { segments, words: segments as TranscriptWord[] };
+}
+
+// Usage
+<TranscriptViewerContainer
+  alignment={alignment}
+  audioSrc={audioUrl}
+  audioType="audio/mpeg"
+  segmentComposer={composeSentences}
+>
+  <TranscriptViewerWords />
+</TranscriptViewerContainer>
+```
+
+### Example: Preserve Audio Tags
+
+```tsx
+function composeWithAudioTags(
+  alignment: CharacterAlignmentResponseModel
+): ComposeSegmentsResult {
+  const result = composeSegments(alignment, { hideAudioTags: false });
+  
+  // Optionally style audio tags differently
+  const segments = result.segments.map(segment => {
+    if (segment.kind === "word" && /^\[.*\]$/.test(segment.text)) {
+      return {
+        ...segment,
+        kind: "gap" as const,
+      };
+    }
+    return segment;
+  });
+  
+  return { ...result, segments };
+}
+```
+
+## Performance Considerations
+
+### Memory Usage
+
+- **Character Arrays**: ~1 byte per character + 8 bytes per number (start/end times)
+- **Segments**: ~100 bytes per segment (objects + strings)
+- **Example**: 10,000 characters ≈ 170KB, composed into ~2,000 words ≈ 200KB
+
+### Optimization Strategies
+
+1. **Memoization** - Segment composition is memoized in `useTranscriptViewer`
+   ```tsx
+   const { segments, words } = useMemo(() => {
+     return composeSegments(alignment, { hideAudioTags });
+   }, [alignment, hideAudioTags]);
+   ```
+
+2. **Binary Search** - O(log n) word lookups instead of O(n)
+
+3. **RAF Updates** - `requestAnimationFrame` prevents excessive re-renders
+
+4. **Index Caching** - Current word index cached to avoid redundant searches
+   ```tsx
+   const [currentWordIndex, setCurrentWordIndex] = useState(0);
+   
+   // Only search if time moved outside current word range
+   if (time < currentWord.startTime || time >= currentWord.endTime) {
+     const newIndex = findWordIndex(words, time);
+     setCurrentWordIndex(newIndex);
+   }
+   ```
+
+## Testing Alignment Data
+
+### Mock Alignment Factory
+
+```tsx
+function createMockAlignment(text: string): CharacterAlignmentResponseModel {
+  const characters = text.split("");
+  const characterStartTimesSeconds: number[] = [];
+  const characterEndTimesSeconds: number[] = [];
+  
+  let time = 0;
+  const charDuration = 0.05; // 50ms per character
+  
+  for (const char of characters) {
+    characterStartTimesSeconds.push(time);
+    characterEndTimesSeconds.push(time + charDuration);
+    time += charDuration;
+    
+    // Add pause after words
+    if (/\s/.test(char)) {
+      time += 0.1;
+    }
+  }
+  
+  return {
+    characters,
+    characterStartTimesSeconds,
+    characterEndTimesSeconds,
+  };
+}
+
+// Usage
+const alignment = createMockAlignment("Hello world [music] how are you?");
+```
+
+## See Also
+
+- [Transcript Viewer Components](/components/transcript-viewer) - UI components using alignment data
+- [useTranscriptViewer Hook](/components/transcript-hooks) - Hook that processes alignment
+- [ElevenLabs Speech-to-Text API](https://elevenlabs.io/docs/api-reference/speech-to-text) - Source of alignment data

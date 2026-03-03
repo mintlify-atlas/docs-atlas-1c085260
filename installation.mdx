@@ -1,0 +1,294 @@
+---
+title: Installation
+description: Complete setup guide for the ElevenLabs Speech-to-Text UI
+---
+
+This guide covers everything you need to install and run the ElevenLabs Speech-to-Text UI on your local machine.
+
+## System requirements
+
+Before installing, ensure your system meets these requirements:
+
+- **Operating System**: macOS, Linux, or Windows (with WSL recommended)
+- **Node.js**: Not required - Bun is an all-in-one JavaScript runtime
+- **RAM**: At least 4GB available
+- **Disk Space**: ~500MB for dependencies and build files
+
+## Install Bun
+
+This project uses [Bun](https://bun.sh) as its JavaScript runtime, package manager, and dev server. Bun is significantly faster than Node.js and npm.
+
+<Steps>
+  <Step title="Install Bun on macOS or Linux">
+    Run the installation script:
+
+    ```bash
+    curl -fsSL https://bun.sh/install | bash
+    ```
+
+    This will download and install the latest version of Bun.
+  </Step>
+
+  <Step title="Install Bun on Windows">
+    On Windows, you can install Bun using PowerShell:
+
+    ```powershell
+    powershell -c "irm bun.sh/install.ps1 | iex"
+    ```
+
+    Alternatively, use WSL (Windows Subsystem for Linux) and follow the macOS/Linux instructions.
+  </Step>
+
+  <Step title="Verify Bun installation">
+    Check that Bun is installed correctly:
+
+    ```bash
+    bun --version
+    ```
+
+    You should see a version number like `1.3.4` or higher.
+  </Step>
+</Steps>
+
+<Info>
+  Bun serves as both the package manager (like npm) and the runtime (like Node.js), so you don't need to install Node.js or npm separately.
+</Info>
+
+## Clone and setup the project
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the project to your local machine:
+
+    ```bash
+    git clone <repository-url>
+    cd <project-directory>
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all required packages using Bun:
+
+    ```bash
+    bun install
+    ```
+
+    This command reads from `package.json` and installs all dependencies:
+
+    ```json
+    {
+      "dependencies": {
+        "@elevenlabs/elevenlabs-js": "^2.34.0",
+        "@radix-ui/react-checkbox": "^1.3.3",
+        "@radix-ui/react-label": "^2.1.7",
+        "@radix-ui/react-progress": "^1.1.8",
+        "@radix-ui/react-select": "^2.2.6",
+        "@radix-ui/react-slot": "^1.2.3",
+        "bun-plugin-tailwind": "^0.1.2",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "lucide-react": "^0.563.0",
+        "react": "^19",
+        "react-dom": "^19",
+        "tailwind-merge": "^3.3.1"
+      }
+    }
+    ```
+
+    <Tip>
+      Bun's package installation is typically 10-20x faster than npm, so this should complete in seconds.
+    </Tip>
+  </Step>
+
+  <Step title="Verify the installation">
+    Ensure everything is set up correctly by starting the development server:
+
+    ```bash
+    bun dev
+    ```
+
+    The server starts using the configuration in `src/index.ts`:
+
+    ```typescript
+    import { serve } from "bun";
+    import index from "./index.html";
+
+    const server = serve({
+      routes: {
+        "/*": index,
+      },
+      development: process.env.NODE_ENV !== "production" && {
+        hmr: true,      // Hot module reloading
+        console: true,  // Echo browser console to server
+      },
+    });
+
+    console.log(`🚀 Server running at ${server.url}`);
+    ```
+
+    You should see:
+
+    ```
+    🚀 Server running at http://localhost:3000
+    ```
+  </Step>
+
+  <Step title="Open the application">
+    Navigate to `http://localhost:3000` in your web browser. You should see the Speech-to-Text Playground interface with:
+
+    - An API key input field
+    - An audio file upload section
+    - Configuration options for transcription
+    - A "Transcribe Audio" button
+  </Step>
+</Steps>
+
+## Development scripts
+
+The project includes several npm scripts defined in `package.json`:
+
+### Start development server
+
+```bash
+bun dev
+```
+
+Runs the development server with hot module reloading enabled. Any changes to source files will automatically refresh the browser.
+
+### Run production build
+
+```bash
+bun start
+```
+
+Starts the server in production mode (sets `NODE_ENV=production`). This disables hot reloading and console echoing for better performance.
+
+### Build the project
+
+```bash
+bun run build
+```
+
+Executes the custom build script defined in `build.ts` to compile and bundle the application.
+
+### Check for unused code
+
+```bash
+bun knip
+```
+
+Runs [Knip](https://github.com/webpro/knip) to identify unused files, dependencies, and exports in your codebase.
+
+## Project structure
+
+Here's an overview of the key directories and files:
+
+```
+.
+├── src/
+│   ├── index.ts                 # Bun server entry point
+│   ├── index.html               # HTML template
+│   ├── index.css                # Global styles
+│   ├── App.tsx                  # Root React component
+│   ├── frontend.tsx             # Frontend entry point
+│   ├── components/
+│   │   └── ui/                  # Reusable UI components
+│   │       ├── button.tsx
+│   │       ├── card.tsx
+│   │       ├── input.tsx
+│   │       ├── select.tsx
+│   │       └── ...
+│   └── features/
+│       ├── speech-to-text-playground/
+│       │   ├── speech-to-text-playground.tsx   # Main playground component
+│       │   ├── transcription-form.tsx          # Form for API key and options
+│       │   ├── transcription-result.tsx        # Results display
+│       │   ├── speech-to-text-types.ts         # TypeScript types
+│       │   └── transcript-utils.ts             # Helper functions
+│       └── transcript-view/
+│           ├── transcript-viewer.tsx            # Interactive transcript UI
+│           ├── use-transcript-viewer.ts        # Transcript viewer hooks
+│           └── ...
+├── package.json                 # Dependencies and scripts
+├── tsconfig.json               # TypeScript configuration
+└── build.ts                    # Build script
+```
+
+## Understanding the core implementation
+
+The main transcription logic is in `src/features/speech-to-text-playground/speech-to-text-playground.tsx`:
+
+```tsx
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+
+// Initialize the ElevenLabs client with your API key
+const browserClient = new ElevenLabsClient({ apiKey });
+
+// Call the Speech-to-Text API
+const transcriptResponse = await browserClient.speechToText.convert({
+  file,
+  modelId: "scribe_v2",
+  languageCode: options.languageCode || undefined,
+  tagAudioEvents: options.tagAudioEvents || false,
+  numSpeakers: options.numSpeakers || undefined,
+  timestampsGranularity: options.timestampsGranularity || "character",
+  diarize: options.diarize || false,
+  useMultiChannel: options.useMultiChannel || false,
+  keyterms: options.keyterms || undefined,
+  entityDetection: options.entityDetection || undefined,
+});
+```
+
+The default configuration is defined in the same file:
+
+```tsx
+const defaultTranscriptOptions: TranscriptOptions = {
+  modelId: "scribe_v2",
+  tagAudioEvents: false,
+  timestampsGranularity: "character",
+  diarize: false,
+  useMultiChannel: false,
+};
+```
+
+## Troubleshooting
+
+### Port already in use
+
+If you see an error about port 3000 being in use, either:
+
+1. Stop the process using that port
+2. Modify the server configuration in `src/index.ts` to use a different port
+
+### Module not found errors
+
+If you encounter module resolution errors:
+
+```bash
+bun install --force
+```
+
+This will clear the cache and reinstall all dependencies.
+
+### TypeScript errors
+
+The project uses TypeScript with strict type checking. If you see type errors:
+
+1. Check that all dependencies are installed: `bun install`
+2. Verify your TypeScript version: `bun tsc --version`
+3. Review the type definitions in `src/features/speech-to-text-playground/speech-to-text-types.ts`
+
+<Warning>
+  Make sure you're using Bun version 1.3.4 or higher. Earlier versions may have compatibility issues with some dependencies.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart guide" icon="rocket" href="/quickstart">
+    Follow the quickstart to transcribe your first audio file
+  </Card>
+  <Card title="Back to introduction" icon="house" href="/introduction">
+    Return to the introduction page
+  </Card>
+</CardGroup>

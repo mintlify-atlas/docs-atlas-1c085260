@@ -1,80 +1,164 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with the ElevenLabs Speech-to-Text UI in under 5 minutes
 ---
 
-## Get started in three steps
+This guide will walk you through setting up the project and transcribing your first audio file using the ElevenLabs Scribe API.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- [Bun](https://bun.sh) installed on your system
+- An [ElevenLabs API key](https://elevenlabs.io/app/speech-synthesis) (sign up for free at ElevenLabs)
+- An audio or video file to transcribe
 
-### Step 2: Deploy your changes
+<Steps>
+  <Step title="Install dependencies">
+    Clone the repository and install the required packages using Bun:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    git clone <repository-url>
+    cd <project-directory>
+    bun install
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    This will install all dependencies from `package.json`, including:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    - `@elevenlabs/elevenlabs-js` - Official ElevenLabs SDK
+    - `react` and `react-dom` - React framework
+    - `@radix-ui/*` - Accessible UI components
+    - `tailwindcss` - Styling framework
+  </Step>
 
-### Step 3: Go live
+  <Step title="Start the development server">
+    Launch the development server with hot module reloading:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    ```bash
+    bun dev
+    ```
+
+    You should see output similar to:
+
+    ```
+    🚀 Server running at http://localhost:3000
+    ```
+
+    Open your browser and navigate to `http://localhost:3000` to see the application.
+
+    <Tip>
+      The dev server includes automatic browser hot reloading and console log echoing, so you can see changes instantly as you modify the code.
+    </Tip>
+  </Step>
+
+  <Step title="Get your ElevenLabs API key">
+    To use the Speech-to-Text API, you'll need an ElevenLabs API key:
+
+    1. Go to [ElevenLabs](https://elevenlabs.io)
+    2. Sign up or log in to your account
+    3. Navigate to your profile settings
+    4. Copy your API key
+
+    <Warning>
+      Keep your API key secure and never commit it to version control. The application accepts the API key through the UI form for security.
+    </Warning>
+  </Step>
+
+  <Step title="Transcribe your first audio file">
+    Now you're ready to transcribe audio:
+
+    1. **Enter your API key** - Paste your ElevenLabs API key into the "ElevenLabs API Key" field
+    2. **Upload an audio file** - Click "Choose File" and select an audio or video file (supports MP3, WAV, M4A, AAC, OGG, WebM, and more)
+    3. **Configure options** (optional) - Customize transcription settings:
+       - **Model**: Choose between Scribe V1 or Scribe V2 (V2 recommended)
+       - **Diarize**: Enable speaker detection for multi-speaker audio
+       - **Timestamps Granularity**: Choose word or character-level timestamps
+       - **Language Code**: Specify a language (e.g., "en", "es", "fr") for better accuracy
+    4. **Click "Transcribe Audio"** - The application will send your file to the ElevenLabs API
+
+    ```tsx
+    // The transcription is handled by the ElevenLabsClient from the SDK
+    const browserClient = new ElevenLabsClient({ apiKey });
+    const transcriptResponse = await browserClient.speechToText.convert({
+      file,
+      modelId: "scribe_v2",
+      timestampsGranularity: "character",
+      diarize: false,
+    });
+    ```
+
+    <Info>
+      Transcription time depends on your audio file length and the selected options. Most files process in seconds.
+    </Info>
+  </Step>
+
+  <Step title="View and interact with results">
+    Once transcription completes, you'll see:
+
+    - **Full transcript text** - The complete transcription of your audio
+    - **Audio player** - Play back the original audio file
+    - **Interactive transcript** - Click any word to jump to that timestamp in the audio
+    - **Speaker labels** - If you enabled diarization, you can rename speakers for clarity
+
+    The transcript viewer provides character-level alignment, so you can see exactly which words were spoken at each moment:
+
+    ```tsx
+    // Each word in the transcript includes timing information
+    {
+      text: "Hello",
+      start: 0.5,
+      end: 0.9,
+      speaker: "speaker_01"
+    }
+    ```
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+Now that you've transcribed your first audio file, you can:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Explore advanced options" icon="sliders">
+    Try different models, enable entity detection, add custom keyterms, or adjust the temperature parameter
+  </Card>
+  <Card title="Read the installation guide" icon="book" href="/installation">
+    Learn more about setting up the development environment and project structure
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common configuration options
+
+Here are some popular transcription configurations:
+
+### Interview or podcast transcription
+
+```tsx
+{
+  modelId: "scribe_v2",
+  diarize: true,              // Detect different speakers
+  numSpeakers: 2,             // Specify number of speakers if known
+  timestampsGranularity: "word"
+}
+```
+
+### Subtitle generation
+
+```tsx
+{
+  modelId: "scribe_v2",
+  timestampsGranularity: "word",
+  languageCode: "en"          // Specify language for accuracy
+}
+```
+
+### Medical or legal transcription
+
+```tsx
+{
+  modelId: "scribe_v2",
+  entityDetection: "pii",     // Detect personally identifiable information
+  keyterms: ["medical term", "legal term"], // Domain-specific vocabulary
+  temperature: 0.0            // Most deterministic output
+}
+```

@@ -1,0 +1,438 @@
+---
+title: Audio Playback Controls
+description: Interactive audio player with scrub bar and synchronized transcript navigation
+---
+
+## Overview
+
+The audio playback system provides a complete set of controls for playing audio files and navigating through transcripts. It features a custom scrub bar for precise seeking, play/pause controls, and automatic time synchronization.
+
+## Audio Component
+
+The viewer uses a hidden HTML5 audio element controlled by React:
+
+```tsx
+function TranscriptViewerAudio({ ...props }: ComponentPropsWithoutRef<"audio">) {
+  const { audioProps } = useTranscriptViewerContext();
+  return <audio {...audioProps} {...props} />;
+}
+```
+
+### Audio Props Configuration
+
+The audio element is configured automatically by the container:
+
+```typescript
+const audioProps = useMemo(
+  () => ({
+    ref: audioRef,
+    controls: false,        // Use custom controls
+    preload: "metadata" as const,
+    src: audioSrc,
+    children: <source src={audioSrc} type={audioType} />,
+  }),
+  [audioRef, audioSrc]
+);
+```
+
+## Play/Pause Control
+
+The play/pause button automatically toggles based on playback state:
+
+```tsx
+function TranscriptViewerPlayPauseButton({
+  className,
+  children,
+  onClick,
+  ...props
+}: TranscriptViewerPlayPauseButtonProps) {
+  const { isPlaying, play, pause } = useTranscriptViewerContext();
+  const Icon = isPlaying ? Pause : Play;
+
+  function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+    if (isPlaying) pause();
+    else play();
+    onClick?.(event);
+  }
+
+  const content =
+    typeof children === "function"
+      ? (children as RenderChildren)({ isPlaying })
+      : children;
+
+  return (
+    <Button onClick={handleClick} className={className} {...props}>
+      {content ?? <Icon />}
+    </Button>
+  );
+}
+```
+
+### Usage
+
+<Tabs>
+  <Tab title="Default Icon">
+    ```tsx
+    <TranscriptViewerPlayPauseButton />
+    ```
+    
+    Displays a Play or Pause icon automatically.
+  </Tab>
+  
+  <Tab title="Custom Content">
+    ```tsx
+    <TranscriptViewerPlayPauseButton>
+      {({ isPlaying }) => isPlaying ? "Pause" : "Play"}
+    </TranscriptViewerPlayPauseButton>
+    ```
+    
+    Render custom content based on playback state.
+  </Tab>
+  
+  <Tab title="Styled Button">
+    ```tsx
+    <TranscriptViewerPlayPauseButton 
+      variant="outline" 
+      size="lg"
+      className="w-full"
+    />
+    ```
+    
+    All Button props are supported.
+  </Tab>
+</Tabs>
+
+## Playback Control Functions
+
+The viewer hook provides imperative playback controls:
+
+```typescript
+const play = useCallback(
+  function play() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play();
+    }
+  },
+  [audioRef]
+);
+
+const pause = useCallback(
+  function pause() {
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.pause();
+    }
+  },
+  [audioRef]
+);
+```
+
+## Scrub Bar
+
+The scrub bar provides visual feedback and seeking capabilities:
+
+```tsx
+function TranscriptViewerScrubBar({
+  className,
+  showTimeLabels = true,
+  labelsClassName,
+  trackClassName,
+  progressClassName,
+  thumbClassName,
+  ...props
+}: TranscriptViewerScrubBarProps) {
+  const { duration, currentTime, seekToTime, startScrubbing, endScrubbing } =
+    useTranscriptViewerContext();
+    
+  return (
+    <ScrubBarContainer
+      duration={duration}
+      value={currentTime}
+      onScrub={seekToTime}
+      onScrubStart={startScrubbing}
+      onScrubEnd={endScrubbing}
+      className={className}
+      {...props}
+    >
+      <ScrubBarTrack className={trackClassName}>
+        <ScrubBarProgress className={progressClassName} />
+        <ScrubBarThumb className={thumbClassName} />
+      </ScrubBarTrack>
+      {showTimeLabels && (
+        <div className="flex justify-between">
+          <ScrubBarTimeLabel time={currentTime} />
+          <ScrubBarTimeLabel time={duration} />
+        </div>
+      )}
+    </ScrubBarContainer>
+  );
+}
+```
+
+### Scrub Bar Components
+
+- **ScrubBarContainer**: Handles mouse/touch events for scrubbing
+- **ScrubBarTrack**: The background track
+- **ScrubBarProgress**: Visual indicator of playback progress
+- **ScrubBarThumb**: Draggable handle for seeking
+- **ScrubBarTimeLabel**: Formatted time display
+
+### Customization
+
+```tsx
+<TranscriptViewerScrubBar
+  showTimeLabels={true}
+  trackClassName="h-2"
+  progressClassName="bg-blue-500"
+  thumbClassName="w-4 h-4"
+  labelsClassName="text-sm text-gray-600"
+/>
+```
+
+## Seeking Functionality
+
+### Seek to Time
+
+Seek to a specific time in seconds:
+
+```typescript
+const seekToTime = useCallback(
+  function seekToTime(time: number) {
+    const node = audioRef.current;
+    if (!node) return;
+    syncSeekTimeState(time);
+    node.currentTime = time;
+  },
+  [audioRef, syncSeekTimeState]
+);
+```
+
+### Seek to Word
+
+Jump to a specific word in the transcript:
+
+```typescript
+const seekToWord = useCallback(
+  function seekToWord(word: number | TranscriptWord) {
+    const target = typeof word === "number" ? words[word] : word;
+    if (!target) return;
+    seekToTime(target.startTime);
+  },
+  [seekToTime, words]
+);
+```
+
+This enables clickable words in the transcript:
+
+```tsx
+<TranscriptViewerWords
+  renderWord={({ word, status }) => (
+    <span
+      className="cursor-pointer hover:underline"
+      onClick={() => seekToWord(word)}
+    >
+      {word.text}
+    </span>
+  )}
+/>
+```
+
+## Scrubbing State Management
+
+When the user drags the scrub bar, the RAF loop is paused for performance:
+
+```typescript
+const startScrubbing = useCallback(
+  function startScrubbing() {
+    setIsScrubbing(true);
+    stopRaf();  // Pause the animation frame loop
+  },
+  [stopRaf]
+);
+
+const endScrubbing = useCallback(
+  function endScrubbing() {
+    setIsScrubbing(false);
+    const node = audioRef.current;
+    if (node && !node.paused) {
+      startRaf();  // Resume if still playing
+    }
+  },
+  [audioRef, startRaf]
+);
+```
+
+<Note>
+  The `isScrubbing` state can be used to show visual feedback during seeking, such as a larger preview or tooltip.
+</Note>
+
+## Audio Event Handling
+
+The viewer listens to all relevant audio events:
+
+```typescript
+useEffect(
+  function setupAudioEventListeners() {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    function handlePlay() {
+      setIsPlaying(!audio.paused);
+      startRaf();
+      onPlay?.();
+    }
+    
+    function handlePause() {
+      setIsPlaying(!audio.paused);
+      setCurrentTime(audio.currentTime);
+      stopRaf();
+      onPause?.();
+    }
+    
+    function handleEnded() {
+      setIsPlaying(false);
+      setCurrentTime(audio.currentTime);
+      stopRaf();
+      onEnded?.();
+    }
+    
+    function handleTimeUpdateEvent() {
+      setCurrentTime(audio.currentTime);
+      onTimeUpdate?.(audio.currentTime);
+    }
+    
+    function handleSeeked() {
+      setCurrentTime(audio.currentTime);
+      handleTimeUpdateRef.current(audio.currentTime);
+    }
+    
+    function handleDuration() {
+      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      onDurationChange?.(audio.duration);
+    }
+
+    // Initial sync
+    setIsPlaying(!audio.paused);
+    setCurrentTime(audio.currentTime);
+    setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+    
+    if (!audio.paused) {
+      startRaf();
+    }
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("timeupdate", handleTimeUpdateEvent);
+    audio.addEventListener("seeked", handleSeeked);
+    audio.addEventListener("durationchange", handleDuration);
+    audio.addEventListener("loadedmetadata", handleDuration);
+
+    return function cleanupAudioEventListeners() {
+      stopRaf();
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("timeupdate", handleTimeUpdateEvent);
+      audio.removeEventListener("seeked", handleSeeked);
+      audio.removeEventListener("durationchange", handleDuration);
+      audio.removeEventListener("loadedmetadata", handleDuration);
+    };
+  },
+  [audioRef, startRaf, stopRaf, onPlay, onPause, onEnded, onTimeUpdate, onDurationChange]
+);
+```
+
+## Duration Fallback
+
+If audio metadata isn't loaded, the viewer uses alignment data as fallback:
+
+```typescript
+function getAlignmentFallbackDuration(
+  alignment: CharacterAlignmentResponseModel | null | undefined,
+  words: TranscriptWord[]
+): number {
+  const ends = alignment?.characterEndTimesSeconds;
+  if (Array.isArray(ends) && ends.length) {
+    const last = ends[ends.length - 1];
+    return typeof last === "number" && Number.isFinite(last) ? last : 0;
+  }
+  if (words.length) {
+    const lastWord = words[words.length - 1];
+    const lastWordEnd = lastWord?.endTime;
+    return typeof lastWordEnd === "number" && Number.isFinite(lastWordEnd)
+      ? lastWordEnd
+      : 0;
+  }
+  return 0;
+}
+```
+
+## State Synchronization
+
+The viewer maintains multiple state sources:
+
+```typescript
+const syncSeekTimeState = useCallback(
+  function syncSeekTimeState(time: number) {
+    setCurrentTime(time);
+    handleTimeUpdateRef.current(time);
+  },
+  []
+);
+```
+
+When seeking:
+1. Update React state (`currentTime`)
+2. Update current word index via `handleTimeUpdate`
+3. Update audio element's `currentTime`
+
+<Warning>
+  Always update state before updating the audio element's currentTime to ensure the UI is in sync when the "seeked" event fires.
+</Warning>
+
+## Complete Example
+
+Here's a full playback interface:
+
+```tsx
+<TranscriptViewerContainer
+  audioSrc={result.audioUrl}
+  audioType={audioType}
+  alignment={result.alignment}
+>
+  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded">
+    <TranscriptViewerPlayPauseButton 
+      variant="outline"
+      size="icon"
+    />
+    <TranscriptViewerScrubBar className="flex-1" />
+  </div>
+  
+  <TranscriptViewerWords 
+    className="p-6"
+    renderWord={({ word, status }) => (
+      <span
+        className={cn(
+          "cursor-pointer transition-all",
+          status === "current" && "text-blue-600 font-bold scale-110",
+          status === "spoken" && "text-gray-400",
+        )}
+        onClick={() => seekToWord(word)}
+      >
+        {word.text}
+      </span>
+    )}
+  />
+  
+  <TranscriptViewerAudio />
+</TranscriptViewerContainer>
+```
+
+## Next Steps
+
+- Learn about [Transcript Viewer](/features/transcript-viewer) word synchronization
+- Configure [Speaker Diarization](/features/speaker-diarization) for multi-speaker audio
+- Explore [Transcription](/features/transcription) API options

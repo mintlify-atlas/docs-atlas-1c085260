@@ -1,0 +1,181 @@
+---
+title: Environment Variables
+description: Configuration and environment variables for the ElevenLabs Speech-to-Text API UI
+---
+
+## Overview
+
+The ElevenLabs Speech-to-Text API UI is designed to be deployed without requiring environment variables for the API key. Instead, users enter their API key directly in the browser UI for enhanced security and ease of deployment.
+
+## No Environment Variables Required
+
+Unlike traditional applications that require API keys to be configured on the server, this project:
+
+- **Client-side API key management**: Users enter their ElevenLabs API key in the UI
+- **No server-side secrets**: No need to configure `.env` files or environment variables
+- **Easy deployment**: Deploy anywhere without additional configuration
+- **Enhanced security**: API keys never touch your server
+
+## Runtime Environment
+
+The only environment consideration is the `NODE_ENV` variable, which is automatically set:
+
+### Development Mode
+
+```bash
+bun run dev
+# NODE_ENV is automatically set by Bun's development server
+```
+
+### Production Mode
+
+```bash
+bun run start
+# Command: NODE_ENV=production bun src/index.ts
+```
+
+The `NODE_ENV=production` setting:
+- Optimizes React for production
+- Disables development warnings
+- Enables production performance optimizations
+
+## Build-time Environment
+
+During the build process (`build.ts:132-134`), the following is automatically defined:
+
+```typescript
+define: {
+  "process.env.NODE_ENV": JSON.stringify("production"),
+}
+```
+
+This replaces all `process.env.NODE_ENV` references in your code with the string `"production"` at build time.
+
+## API Key Configuration
+
+<Steps>
+  <Step title="No server configuration needed">
+    You don't need to configure any API keys on your server or in environment files.
+  </Step>
+
+  <Step title="Users enter API key in UI">
+    When users access your deployed application, they enter their own ElevenLabs API key in the settings or configuration panel.
+  </Step>
+
+  <Step title="Key stored in browser">
+    The API key is stored in the user's browser (localStorage or sessionStorage) and used for client-side API requests.
+  </Step>
+</Steps>
+
+## Deployment Platforms
+
+Since no environment variables are required, deployment is straightforward on all platforms:
+
+<CodeGroup>
+```bash Vercel
+# No environment variables needed
+# Just deploy the repository
+vercel
+```
+
+```bash Netlify
+# No environment variables needed
+# Just build and deploy
+netlify deploy --prod
+```
+
+```bash Generic Platform
+# Build the project
+bun run build
+
+# Deploy the dist/ folder
+# No environment configuration required
+```
+</CodeGroup>
+
+## Optional: Custom Configuration
+
+If you want to add custom environment variables for your own purposes, you can:
+
+### Create a `.env` file
+
+```bash
+# .env (not required for basic functionality)
+CUSTOM_FEATURE_FLAG=true
+ANALYTICS_ID=your-analytics-id
+```
+
+### Access in Build Script
+
+Modify `build.ts` to include custom environment variables:
+
+```typescript
+define: {
+  "process.env.NODE_ENV": JSON.stringify("production"),
+  "process.env.CUSTOM_FEATURE_FLAG": JSON.stringify(process.env.CUSTOM_FEATURE_FLAG),
+}
+```
+
+### Access in Code
+
+```typescript
+if (process.env.CUSTOM_FEATURE_FLAG === "true") {
+  // Enable custom feature
+}
+```
+
+## Security Considerations
+
+### Why Client-side API Keys?
+
+This architecture provides several benefits:
+
+1. **No server-side secrets**: Your deployment has no sensitive data
+2. **User responsibility**: Each user manages their own API key
+3. **Easy deployment**: No secret management required
+4. **Scalability**: No server-side API rate limits to manage
+
+### Best Practices
+
+<Warning>
+  Remind users to:
+  - Never share their API keys
+  - Use API keys with appropriate rate limits
+  - Revoke keys if they suspect compromise
+</Warning>
+
+<Info>
+  The application runs entirely in the user's browser. All API requests to ElevenLabs are made directly from the client, with the user's API key included in the request headers.
+</Info>
+
+## Platform-Specific Notes
+
+### Vercel
+
+No environment variables configuration needed in `vercel.json` or the Vercel dashboard.
+
+### Netlify
+
+No environment variables configuration needed in `netlify.toml` or the Netlify dashboard.
+
+### Docker
+
+If deploying with Docker, no environment variables need to be passed:
+
+```dockerfile
+FROM oven/bun:1
+
+WORKDIR /app
+
+COPY package.json bun.lockb ./
+RUN bun install
+
+COPY . .
+RUN bun run build
+
+EXPOSE 3000
+
+CMD ["bun", "run", "start"]
+```
+
+No `ENV` or `--env` flags required.

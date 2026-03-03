@@ -1,0 +1,597 @@
+---
+title: 'Form Controls'
+description: 'Form UI components including inputs, selects, checkboxes, textareas, buttons, and labels'
+---
+
+## Overview
+
+This page documents the core form control components built with Radix UI primitives and styled with Tailwind CSS. All components include focus states, validation states, and dark mode support.
+
+## Button
+
+A versatile button component with multiple variants and sizes, built with `@radix-ui/react-slot` for composition.
+
+### Props
+
+<ParamField path="variant" type="string">
+  Visual style variant:
+  - `default` - Primary button with solid background
+  - `destructive` - Destructive action (red)
+  - `outline` - Outlined button with border
+  - `secondary` - Secondary style
+  - `ghost` - Transparent with hover effect
+  - `link` - Text link style with underline
+  
+  Default: `"default"`
+</ParamField>
+
+<ParamField path="size" type="string">
+  Button size:
+  - `default` - 36px height (`h-9`)
+  - `sm` - 32px height (`h-8`)
+  - `lg` - 40px height (`h-10`)
+  - `icon` - Square 36px (`size-9`)
+  - `icon-sm` - Square 32px (`size-8`)
+  - `icon-lg` - Square 40px (`size-10`)
+  
+  Default: `"default"`
+</ParamField>
+
+<ParamField path="asChild" type="boolean">
+  When `true`, renders as a Slot component allowing composition with other elements (e.g., Next.js Link)
+  
+  Default: `false`
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+Inherits all standard HTML `<button>` attributes.
+
+### Usage Examples
+
+#### Basic Button
+
+```tsx
+import { Button } from '@/components/ui/button';
+
+<Button>Click me</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="outline">Cancel</Button>
+<Button variant="ghost">Dismiss</Button>
+```
+
+#### Button Sizes
+
+```tsx
+<Button size="sm">Small</Button>
+<Button size="default">Default</Button>
+<Button size="lg">Large</Button>
+```
+
+#### Icon Buttons
+
+```tsx
+import { UploadIcon } from 'lucide-react';
+
+<Button size="icon">
+  <UploadIcon />
+</Button>
+```
+
+#### Button with Icon
+
+```tsx
+import { UploadIcon } from 'lucide-react';
+
+<Button>
+  <UploadIcon className="mr-2 h-4 w-4" />
+  Transcribe Audio
+</Button>
+```
+
+#### From TranscriptionForm (`src/features/speech-to-text-playground/transcription-form.tsx:373`)
+
+```tsx
+<Button
+  type="submit"
+  size="lg"
+  className="w-full"
+  disabled={!file || !apiKey || isTranscribing}
+>
+  {isTranscribing ? (
+    <>
+      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+      Transcribing...
+    </>
+  ) : (
+    <>
+      <UploadIcon className="mr-2 h-4 w-4" />
+      Transcribe Audio
+    </>
+  )}
+</Button>
+```
+
+---
+
+## Input
+
+Text input field with focus and validation states.
+
+### Props
+
+<ParamField path="type" type="string">
+  Input type (text, password, email, number, file, etc.)
+  
+  Default: `"text"`
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+Inherits all standard HTML `<input>` attributes.
+
+### Features
+
+- **Focus States**: Blue ring on focus (`focus-visible:ring-ring/50`)
+- **Validation States**: Red border and ring when `aria-invalid` is set
+- **Dark Mode**: Semi-transparent background (`dark:bg-input/30`)
+- **File Input Support**: Styled file input button
+- **Selection**: Custom selection colors
+
+### Usage Examples
+
+#### Text Input
+
+```tsx
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+<div className="space-y-2">
+  <Label htmlFor="email">Email</Label>
+  <Input id="email" type="email" placeholder="Enter your email" />
+</div>
+```
+
+#### Password Input
+
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="apiKey">ElevenLabs API Key</Label>
+  <Input
+    id="apiKey"
+    type="password"
+    placeholder="Enter your API key"
+    value={apiKey}
+    onChange={handleApiKeyChange}
+    required
+  />
+</div>
+```
+
+#### Number Input
+
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="speakers">Number of Speakers</Label>
+  <Input
+    id="speakers"
+    type="number"
+    min="1"
+    max="32"
+    placeholder="Auto-detect"
+    value={numSpeakers || ""}
+    onChange={handleNumSpeakersChange}
+  />
+</div>
+```
+
+#### File Input
+
+```tsx
+<div className="space-y-2">
+  <Label htmlFor="file">Audio/Video File</Label>
+  <Input
+    id="file"
+    type="file"
+    accept="audio/*,video/*"
+    onChange={handleFileChange}
+  />
+</div>
+```
+
+---
+
+## Textarea
+
+Multi-line text input with auto-resize support.
+
+### Props
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+Inherits all standard HTML `<textarea>` attributes.
+
+### Features
+
+- **Auto-resize**: Uses `field-sizing-content` for automatic height adjustment
+- **Minimum Height**: Default `min-h-16` (64px)
+- **Focus States**: Same as Input component
+- **Validation States**: Red border and ring when `aria-invalid` is set
+
+### Usage Example
+
+From TranscriptionForm (`src/features/speech-to-text-playground/transcription-form.tsx:290`):
+
+```tsx
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+
+<div className="space-y-2 md:col-span-2">
+  <Label htmlFor="keyterms">Keyterms (comma-separated)</Label>
+  <Textarea
+    id="keyterms"
+    placeholder="technical term, product name, ..."
+    value={keytermsValue}
+    onChange={handleKeytermsChange}
+    className="resize-none h-20"
+  />
+</div>
+```
+
+---
+
+## Label
+
+Accessible label component built with `@radix-ui/react-label`.
+
+### Props
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+Inherits all props from `@radix-ui/react-label`.
+
+### Features
+
+- **Accessibility**: Proper label-input association
+- **Disabled States**: Automatically styles when associated input is disabled
+- **Flex Layout**: Default `flex items-center gap-2` for icon support
+- **Non-selectable**: Uses `select-none` to prevent text selection
+
+### Usage Examples
+
+#### Basic Label
+
+```tsx
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+
+<div className="space-y-2">
+  <Label htmlFor="username">Username</Label>
+  <Input id="username" />
+</div>
+```
+
+#### Label with Checkbox
+
+```tsx
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+
+<div className="flex items-center space-x-2">
+  <Checkbox id="terms" />
+  <Label htmlFor="terms" className="cursor-pointer">
+    Accept terms and conditions
+  </Label>
+</div>
+```
+
+---
+
+## Checkbox
+
+Checkbox component built with `@radix-ui/react-checkbox`.
+
+### Props
+
+<ParamField path="checked" type="boolean | 'indeterminate'">
+  Controlled checked state
+</ParamField>
+
+<ParamField path="onCheckedChange" type="(checked: boolean | 'indeterminate') => void">
+  Callback fired when checked state changes
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Disables the checkbox
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+Inherits all props from `@radix-ui/react-checkbox`.
+
+### Features
+
+- **Radix UI**: Built on `@radix-ui/react-checkbox` for accessibility
+- **Check Icon**: Uses `lucide-react` Check icon
+- **States**: Supports checked, unchecked, and indeterminate states
+- **Focus Ring**: Visible focus indicator
+
+### Usage Example
+
+From TranscriptionForm (`src/features/speech-to-text-playground/transcription-form.tsx:312`):
+
+```tsx
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+
+type CheckboxChecked = boolean | "indeterminate";
+
+function handleDiarizeChange(checked: CheckboxChecked) {
+  onOptionsChange({ ...options, diarize: checked === true });
+}
+
+<div className="flex items-center space-x-2">
+  <Checkbox
+    id="diarize"
+    checked={options.diarize}
+    onCheckedChange={handleDiarizeChange}
+  />
+  <Label htmlFor="diarize" className="cursor-pointer">
+    Diarize (Speaker Detection)
+  </Label>
+</div>
+```
+
+---
+
+## Select
+
+Dropdown select component built with `@radix-ui/react-select`.
+
+### Components
+
+The Select component is composed of multiple sub-components:
+
+- **Select** - Root component
+- **SelectTrigger** - Button that opens the dropdown
+- **SelectValue** - Displays selected value
+- **SelectContent** - Dropdown container
+- **SelectItem** - Individual option
+
+### Props
+
+#### Select (Root)
+
+<ParamField path="value" type="string">
+  Controlled selected value
+</ParamField>
+
+<ParamField path="onValueChange" type="(value: string) => void">
+  Callback fired when selection changes
+</ParamField>
+
+<ParamField path="disabled" type="boolean">
+  Disables the select
+</ParamField>
+
+#### SelectTrigger
+
+<ParamField path="size" type="'sm' | 'default'">
+  Trigger button size
+  - `default` - 36px height (`h-9`)
+  - `sm` - 32px height (`h-8`)
+  
+  Default: `"default"`
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes
+</ParamField>
+
+#### SelectContent
+
+<ParamField path="position" type="'popper' | 'item-aligned'">
+  Positioning strategy
+  
+  Default: `"popper"`
+</ParamField>
+
+<ParamField path="align" type="'start' | 'center' | 'end'">
+  Alignment relative to trigger
+  
+  Default: `"center"`
+</ParamField>
+
+### Features
+
+- **Radix UI**: Built on `@radix-ui/react-select` for accessibility
+- **Icons**: Uses `lucide-react` chevron icons
+- **Scroll Buttons**: Automatic scroll indicators for long lists
+- **Animations**: Smooth open/close animations
+- **Dark Mode**: Styled for dark backgrounds
+
+### Usage Example
+
+From TranscriptionForm (`src/features/speech-to-text-playground/transcription-form.tsx:194`):
+
+```tsx
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+
+function handleModelChange(value: string) {
+  if (!isTranscriptModelId(value)) return;
+  onOptionsChange({ ...options, modelId: value });
+}
+
+<div className="space-y-2">
+  <Label htmlFor="model">Model</Label>
+  <Select value={options.modelId} onValueChange={handleModelChange}>
+    <SelectTrigger id="model">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="scribe_v1">Scribe V1</SelectItem>
+      <SelectItem value="scribe_v2">Scribe V2</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+```
+
+### Select with Icons
+
+```tsx
+import { CheckIcon, ChevronDownIcon } from 'lucide-react';
+
+<Select value={timestamps} onValueChange={handleTimestampsChange}>
+  <SelectTrigger id="timestamps">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="none">None</SelectItem>
+    <SelectItem value="word">Word</SelectItem>
+    <SelectItem value="character">Character</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+---
+
+## Styling
+
+All form components use consistent styling patterns:
+
+### Focus States
+
+```css
+focus-visible:border-ring
+focus-visible:ring-ring/50
+focus-visible:ring-[3px]
+```
+
+### Validation States
+
+```css
+aria-invalid:ring-destructive/20
+aria-invalid:border-destructive
+dark:aria-invalid:ring-destructive/40
+```
+
+### Dark Mode
+
+```css
+dark:bg-input/30
+dark:border-input
+dark:hover:bg-input/50
+```
+
+### Disabled States
+
+```css
+disabled:pointer-events-none
+disabled:cursor-not-allowed
+disabled:opacity-50
+```
+
+## TypeScript Interfaces
+
+### Button Variants (from `class-variance-authority`)
+
+```typescript
+import { cva, type VariantProps } from "class-variance-authority";
+
+const buttonVariants = cva("...", {
+  variants: {
+    variant: {
+      default: "...",
+      destructive: "...",
+      outline: "...",
+      secondary: "...",
+      ghost: "...",
+      link: "...",
+    },
+    size: {
+      default: "h-9 px-4 py-2 has-[>svg]:px-3",
+      sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
+      lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
+      icon: "size-9",
+      "icon-sm": "size-8",
+      "icon-lg": "size-10",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    size: "default",
+  },
+});
+```
+
+### Component Props
+
+```typescript
+// Button
+type ButtonProps = React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  };
+
+// Input
+type InputProps = React.ComponentProps<"input">;
+
+// Textarea
+type TextareaProps = React.ComponentProps<"textarea">;
+
+// Label
+type LabelProps = React.ComponentProps<typeof LabelPrimitive.Root>;
+
+// Checkbox
+type CheckboxProps = React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>;
+
+// Select
+type SelectProps = React.ComponentProps<typeof SelectPrimitive.Root>;
+```
+
+## Radix UI Integration
+
+These components integrate the following Radix UI primitives:
+
+- **Button**: `@radix-ui/react-slot` for composition
+- **Label**: `@radix-ui/react-label` for accessibility
+- **Checkbox**: `@radix-ui/react-checkbox` for state management
+- **Select**: `@radix-ui/react-select` for dropdown functionality
+
+### Why Radix UI?
+
+- **Accessibility**: WAI-ARIA compliant components
+- **Unstyled**: Full control over styling with Tailwind CSS
+- **Composable**: Flexible component APIs
+- **Keyboard Navigation**: Built-in keyboard support
+
+## Accessibility
+
+- All form controls support proper label association
+- Focus states are clearly visible
+- Error states use `aria-invalid` attribute
+- Keyboard navigation fully supported
+- Screen reader friendly with proper ARIA attributes
+
+## Related Documentation
+
+- [Radix UI Documentation](https://www.radix-ui.com/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/)
+- [Class Variance Authority](https://cva.style/)

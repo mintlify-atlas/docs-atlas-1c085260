@@ -1,0 +1,461 @@
+---
+title: 'Advanced Settings'
+description: 'Configure keyterms, entity detection, temperature, and seed for enhanced transcription control'
+---
+
+## Overview
+
+Advanced settings provide fine-grained control over the transcription process, including domain-specific terminology, entity detection, and output randomness control.
+
+These options are part of the `TranscriptOptions` interface:
+
+```typescript
+export type TranscriptOptions = {
+  // ... basic options
+  temperature?: number;
+  seed?: number;
+  keyterms?: string[];
+  entityDetection?: string;
+};
+```
+
+## Randomness Control
+
+### Temperature
+
+<ParamField path="temperature" type="number" default="undefined">
+  Controls the randomness of the transcription output (0.0-2.0).
+  
+  - **0.0**: Deterministic, always produces the same output for the same input
+  - **1.0**: Balanced creativity and consistency
+  - **2.0**: Maximum randomness and creativity
+  
+  Lower temperatures are recommended for most transcription use cases to ensure consistency.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Label htmlFor="temperature">Temperature (0.0-2.0)</Label>
+<Input
+  id="temperature"
+  type="number"
+  step="0.1"
+  min="0"
+  max="2"
+  placeholder="Default"
+  value={options.temperature || ""}
+  onChange={handleTemperatureChange}
+/>
+```
+
+**Implementation:**
+
+```tsx
+function handleTemperatureChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+  const temperature = value ? parseFloat(value) : undefined;
+  onOptionsChange({ ...options, temperature });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  temperature: options.temperature || undefined,
+  // ... other options
+});
+```
+
+<Warning>
+  Using temperature values above 1.0 may result in less predictable transcriptions. For production use cases, values between 0.0 and 0.5 are recommended.
+</Warning>
+
+### Seed
+
+<ParamField path="seed" type="number" default="undefined">
+  Random seed for reproducible transcriptions.
+  
+  When a seed is provided, the model will produce the same transcription output for the same input audio, even with non-zero temperature values.
+  
+  Useful for:
+  - Debugging and testing
+  - Ensuring consistent results across multiple runs
+  - Comparing different configurations with the same randomness
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Label htmlFor="seed">Seed (optional)</Label>
+<Input
+  id="seed"
+  type="number"
+  placeholder="Random"
+  value={options.seed || ""}
+  onChange={handleSeedChange}
+/>
+```
+
+**Implementation:**
+
+```tsx
+function handleSeedChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+  const seed = value ? parseInt(value, 10) : undefined;
+  onOptionsChange({ ...options, seed });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  seed: options.seed || undefined,
+  // ... other options
+});
+```
+
+<Tip>
+  Combine `temperature: 0` with a specific `seed` value to ensure 100% reproducible transcriptions for testing and quality assurance.
+</Tip>
+
+## Domain-Specific Configuration
+
+### Keyterms
+
+<ParamField path="keyterms" type="string[]" default="undefined">
+  Array of domain-specific terms, technical jargon, product names, or proper nouns that should be recognized accurately.
+  
+  Examples:
+  - Technical terms: `["API", "OAuth", "REST", "GraphQL"]`
+  - Product names: `["ElevenLabs", "Scribe API", "GPT-4"]`
+  - Company names: `["Anthropic", "OpenAI", "Google Cloud"]`
+  - Medical terms: `["hypertension", "acetaminophen"]`
+  
+  The model will be more likely to transcribe these exact terms when they appear in the audio.
+</ParamField>
+
+**Usage in UI:**
+
+The UI accepts keyterms as comma-separated values:
+
+```tsx
+<Label htmlFor="keyterms">Keyterms (comma-separated)</Label>
+<Textarea
+  id="keyterms"
+  placeholder="technical term, product name, ..."
+  value={keytermsValue}
+  onChange={handleKeytermsChange}
+  className="resize-none h-20"
+/>
+```
+
+**Implementation:**
+
+Keyterms are parsed from a comma-separated string:
+
+```tsx
+const keytermsValue = options.keyterms?.join(", ") || "";
+
+function handleKeytermsChange(event: ChangeEvent<HTMLTextAreaElement>) {
+  const keyterms = parseKeytermsInput(event.target.value);
+  onOptionsChange({ ...options, keyterms });
+}
+```
+
+The `parseKeytermsInput` utility function converts the comma-separated string to an array:
+
+```tsx
+// Example utility function
+function parseKeytermsInput(input: string): string[] | undefined {
+  const trimmed = input.trim();
+  if (!trimmed) return undefined;
+  
+  return trimmed
+    .split(',')
+    .map(term => term.trim())
+    .filter(term => term.length > 0);
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  keyterms: options.keyterms || undefined,
+  // ... other options
+});
+```
+
+**Example:**
+
+For a podcast discussing AI technology:
+
+```tsx
+const transcriptOptions = {
+  // ... other options
+  keyterms: [
+    "ElevenLabs",
+    "Speech-to-Text",
+    "Scribe API",
+    "GPT-4",
+    "LLM",
+    "transformer",
+    "neural network"
+  ]
+};
+```
+
+<Info>
+  Keyterms are case-sensitive. Include variations if needed (e.g., both "API" and "api" if the speaker might say it differently).
+</Info>
+
+### Entity Detection
+
+<ParamField path="entityDetection" type="string" default="undefined">
+  Enable detection and redaction of sensitive information in the transcription.
+  
+  Common values:
+  - **`"pii"`**: Personally Identifiable Information (names, addresses, phone numbers, email addresses)
+  - **`"phi"`**: Protected Health Information (medical record numbers, diagnoses, treatment information)
+  - **`"all"`**: All supported entity types
+  - Custom entity types as supported by the API
+  
+  Detected entities may be tagged or redacted in the output depending on the API configuration.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Label htmlFor="entity">Entity Detection</Label>
+<Input
+  id="entity"
+  placeholder="e.g., pii, phi, all"
+  value={options.entityDetection || ""}
+  onChange={handleEntityDetectionChange}
+/>
+```
+
+**Implementation:**
+
+```tsx
+function handleEntityDetectionChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value || undefined;
+  onOptionsChange({ ...options, entityDetection: value });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  entityDetection: options.entityDetection || undefined,
+  // ... other options
+});
+```
+
+**Example Use Cases:**
+
+<AccordionGroup>
+  <Accordion title="Healthcare Transcription">
+    For medical consultations or healthcare-related audio:
+    
+    ```tsx
+    {
+      // ... other options
+      entityDetection: "phi",
+      keyterms: [
+        "hypertension",
+        "acetaminophen",
+        "CBC",
+        "MRI"
+      ]
+    }
+    ```
+    
+    This will detect and tag Protected Health Information while accurately transcribing medical terminology.
+  </Accordion>
+
+  <Accordion title="Customer Support Calls">
+    For customer service or support call transcription:
+    
+    ```tsx
+    {
+      // ... other options
+      entityDetection: "pii",
+      keyterms: [
+        "YourCompany",
+        "ProductName",
+        "Premium Plan",
+        "Basic Tier"
+      ]
+    }
+    ```
+    
+    This will identify customer information while preserving product-specific terms.
+  </Accordion>
+
+  <Accordion title="Legal Proceedings">
+    For legal or compliance-related transcription:
+    
+    ```tsx
+    {
+      // ... other options
+      entityDetection: "all",
+      temperature: 0,
+      seed: 12345,
+      keyterms: [
+        "plaintiff",
+        "defendant",
+        "jurisdiction",
+        "statute"
+      ]
+    }
+    ```
+    
+    Ensures reproducible, accurate transcriptions with entity detection and legal terminology.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Entity detection is not a substitute for proper security and compliance measures. Always review transcriptions containing sensitive information and ensure they are handled according to your organization's policies and regulatory requirements.
+</Warning>
+
+## Complete API Call Example
+
+Here's how all advanced settings are used in the actual API call from `speech-to-text-playground.tsx`:
+
+```tsx
+const browserClient = new ElevenLabsClient({ apiKey });
+const transcriptResponse = await browserClient.speechToText.convert({
+  file,
+  modelId: options.modelId || "scribe_v2",
+  languageCode: options.languageCode || undefined,
+  tagAudioEvents: options.tagAudioEvents || false,
+  numSpeakers: options.numSpeakers || undefined,
+  timestampsGranularity: options.timestampsGranularity || "character",
+  diarize: options.diarize || false,
+  diarizationThreshold: options.diarizationThreshold || undefined,
+  temperature: options.temperature || undefined,
+  seed: options.seed || undefined,
+  useMultiChannel: options.useMultiChannel || false,
+  keyterms: options.keyterms || undefined,
+  entityDetection: options.entityDetection || undefined,
+});
+```
+
+## Advanced Configuration Examples
+
+<AccordionGroup>
+  <Accordion title="Reproducible Research Transcription">
+    For academic or research purposes requiring reproducible results:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      languageCode: "en",
+      temperature: 0,
+      seed: 42,
+      timestampsGranularity: "character",
+      diarize: true,
+      keyterms: [
+        "hypothesis",
+        "methodology",
+        "p-value",
+        "statistical significance"
+      ]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Multi-Language Technical Content">
+    For technical content that might contain multiple languages:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      // Don't specify languageCode to enable auto-detection
+      timestampsGranularity: "word",
+      keyterms: [
+        "API",
+        "REST",
+        "microservices",
+        "Kubernetes",
+        "Docker",
+        "CI/CD"
+      ]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Privacy-Focused Meeting Transcription">
+    For meetings with sensitive information:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      languageCode: "en",
+      entityDetection: "pii",
+      diarize: true,
+      tagAudioEvents: true,
+      timestampsGranularity: "word",
+      keyterms: [
+        "CompanyName",
+        "Project Alpha",
+        "Q4 Roadmap"
+      ]
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Creative Content with Variation">
+    For content where you want some variation in transcription:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      temperature: 0.3,
+      // No seed for variation
+      timestampsGranularity: "word",
+      tagAudioEvents: true
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Card title="Keyterms Tips" icon="lightbulb">
+  - Include acronyms and their expanded forms
+  - Add product names, company names, and proper nouns
+  - Include technical jargon specific to your domain
+  - Keep the list focused (10-50 terms typically)
+  - Update the list as you discover commonly misheard terms
+</Card>
+
+<Card title="Temperature & Seed" icon="temperature-half">
+  - Use `temperature: 0` for maximum consistency
+  - Set a `seed` value when you need reproducible results
+  - Avoid temperatures above 1.0 for production use
+  - Test different temperature values to find the right balance
+</Card>
+
+<Card title="Entity Detection" icon="shield">
+  - Always review auto-detected entities for accuracy
+  - Combine with manual review for compliance-critical use cases
+  - Test with sample data before processing sensitive information
+  - Understand your regulatory requirements (HIPAA, GDPR, etc.)
+</Card>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Setup" icon="key" href="/configuration/api-setup">
+    Learn how to configure your ElevenLabs API key
+  </Card>
+  <Card title="Transcription Options" icon="sliders" href="/configuration/transcription-options">
+    Configure basic transcription options
+  </Card>
+</CardGroup>

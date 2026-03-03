@@ -1,0 +1,235 @@
+---
+title: Audio/Video Transcription
+description: Convert audio and video files to text using the ElevenLabs Speech-to-Text API
+---
+
+## Overview
+
+The transcription feature uses the ElevenLabs Scribe API to convert audio and video files into accurate text transcripts. It supports multiple audio formats, language detection, and various configuration options for precision control.
+
+## Supported Audio Formats
+
+The application accepts the following audio and video formats:
+
+```typescript
+type AudioType =
+  | "audio/mpeg"
+  | "audio/wav"
+  | "audio/ogg"
+  | "audio/mp3"
+  | "audio/m4a"
+  | "audio/aac"
+  | "audio/webm";
+```
+
+The system automatically detects the audio type from the file extension or MIME type.
+
+## Configuration Options
+
+All transcription options are defined in the `TranscriptOptions` interface:
+
+```typescript
+export type TranscriptOptions = {
+  modelId: "scribe_v1" | "scribe_v2";
+  languageCode?: string;
+  tagAudioEvents: boolean;
+  numSpeakers?: number;
+  timestampsGranularity: "none" | "word" | "character";
+  diarize: boolean;
+  diarizationThreshold?: number;
+  temperature?: number;
+  seed?: number;
+  useMultiChannel: boolean;
+  keyterms?: string[];
+  entityDetection?: string;
+};
+```
+
+### Key Options
+
+<Tabs>
+  <Tab title="Model Selection">
+    Choose between two transcription models:
+    
+    - **scribe_v1**: First generation model
+    - **scribe_v2**: Latest model with improved accuracy (default)
+    
+    ```typescript
+    modelId: "scribe_v2"
+    ```
+  </Tab>
+  
+  <Tab title="Timestamps">
+    Control the granularity of timestamp data:
+    
+    - **none**: No timestamps
+    - **word**: Word-level timestamps
+    - **character**: Character-level timestamps (default)
+    
+    ```typescript
+    timestampsGranularity: "character"
+    ```
+  </Tab>
+  
+  <Tab title="Language">
+    Optionally specify a language code to improve accuracy:
+    
+    ```typescript
+    languageCode: "en"  // English
+    languageCode: "es"  // Spanish
+    languageCode: "fr"  // French
+    ```
+  </Tab>
+</Tabs>
+
+## Making API Calls
+
+The transcription is performed using the ElevenLabs JavaScript SDK. Here's the actual implementation from the playground:
+
+```typescript
+import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+
+async function handleTranscribe(file: File, apiKey: string, options: TranscriptOptions) {
+  const browserClient = new ElevenLabsClient({ apiKey });
+  
+  const transcriptResponse = await browserClient.speechToText.convert({
+    file,
+    modelId: options.modelId || "scribe_v2",
+    languageCode: options.languageCode || undefined,
+    tagAudioEvents: options.tagAudioEvents || false,
+    numSpeakers: options.numSpeakers || undefined,
+    timestampsGranularity: options.timestampsGranularity || "character",
+    diarize: options.diarize || false,
+    diarizationThreshold: options.diarizationThreshold || undefined,
+    temperature: options.temperature || undefined,
+    seed: options.seed || undefined,
+    useMultiChannel: options.useMultiChannel || false,
+    keyterms: options.keyterms || undefined,
+    entityDetection: options.entityDetection || undefined,
+  });
+  
+  return transcriptResponse;
+}
+```
+
+<Note>
+  The API call is made from speech-to-text-playground.tsx:48-62. All options are passed directly to the ElevenLabs SDK.
+</Note>
+
+## Advanced Options
+
+### Temperature & Seed
+
+Control the randomness and reproducibility of transcriptions:
+
+```typescript
+temperature: 0.5  // Range: 0.0-2.0 (lower = more deterministic)
+seed: 42          // Fixed seed for reproducible results
+```
+
+### Keyterms
+
+Provide domain-specific terms to improve recognition accuracy:
+
+```typescript
+keyterms: ["ElevenLabs", "API", "transcription"]
+```
+
+Keyterms are parsed from comma-separated input:
+
+```typescript
+export function parseKeytermsInput(value: string): string[] | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+```
+
+### Entity Detection
+
+Detect and optionally redact sensitive information:
+
+```typescript
+entityDetection: "pii"  // Personally Identifiable Information
+entityDetection: "phi"  // Protected Health Information
+entityDetection: "all"  // All entity types
+```
+
+### Audio Event Tagging
+
+Tag non-speech audio events (laughter, applause, etc.):
+
+```typescript
+tagAudioEvents: true
+```
+
+## Response Handling
+
+The API returns a `SpeechToTextChunkResponseModel` containing:
+
+- Full transcript text
+- Word-level data with timestamps
+- Speaker information (if diarization enabled)
+- Character-level alignment data
+
+```typescript
+const audioUrl = URL.createObjectURL(file);
+const alignment = convertToAlignment(transcriptResponse);
+
+setResult({
+  transcript: transcriptResponse,
+  audioUrl,
+  alignment,
+});
+```
+
+## Error Handling
+
+The application includes specialized error parsing for ElevenLabs API errors:
+
+```typescript
+export function getElevenLabsErrorMessage(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const body = Reflect.get(error, "body");
+  const parsedBody = typeof body === "string" ? safeParseJson(body) : body;
+  if (!parsedBody || typeof parsedBody !== "object") return undefined;
+
+  const detail = Reflect.get(parsedBody, "detail");
+  if (typeof detail === "string") return detail;
+
+  if (detail && typeof detail === "object") {
+    const detailMessage = Reflect.get(detail, "message");
+    if (typeof detailMessage === "string") return detailMessage;
+    return JSON.stringify(detail);
+  }
+
+  return undefined;
+}
+```
+
+<Warning>
+  Always handle API errors gracefully and provide meaningful feedback to users about authentication issues, file format problems, or quota limits.
+</Warning>
+
+## Default Configuration
+
+The playground uses these defaults:
+
+```typescript
+const defaultTranscriptOptions: TranscriptOptions = {
+  modelId: "scribe_v2",
+  tagAudioEvents: false,
+  timestampsGranularity: "character",
+  diarize: false,
+  useMultiChannel: false,
+};
+```
+
+## Next Steps
+
+- Learn about [Speaker Diarization](/features/speaker-diarization) to identify different speakers
+- Explore the [Transcript Viewer](/features/transcript-viewer) for displaying results
+- Configure [Audio Playback](/features/audio-playback) controls

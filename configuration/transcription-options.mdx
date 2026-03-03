@@ -1,0 +1,422 @@
+---
+title: 'Transcription Options'
+description: 'Configure model selection, language, timestamps, and speaker detection for accurate transcriptions'
+---
+
+## Overview
+
+The Speech-to-Text Playground provides comprehensive transcription configuration options. All options are part of the `TranscriptOptions` interface defined in `speech-to-text-types.ts`:
+
+```typescript
+export type TranscriptOptions = {
+  modelId: "scribe_v1" | "scribe_v2";
+  languageCode?: string;
+  tagAudioEvents: boolean;
+  numSpeakers?: number;
+  timestampsGranularity: "none" | "word" | "character";
+  diarize: boolean;
+  diarizationThreshold?: number;
+  temperature?: number;
+  seed?: number;
+  useMultiChannel: boolean;
+  keyterms?: string[];
+  entityDetection?: string;
+};
+```
+
+## Default Configuration
+
+The playground uses these default values:
+
+```tsx
+const defaultTranscriptOptions: TranscriptOptions = {
+  modelId: "scribe_v2",
+  tagAudioEvents: false,
+  timestampsGranularity: "character",
+  diarize: false,
+  useMultiChannel: false,
+};
+```
+
+## Core Options
+
+### Model Selection
+
+<ParamField path="modelId" type="'scribe_v1' | 'scribe_v2'" default="scribe_v2" required>
+  The Scribe model version to use for transcription.
+  
+  - **scribe_v1**: First generation model, stable and reliable
+  - **scribe_v2**: Latest model with improved accuracy and features (recommended)
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Select value={options.modelId} onValueChange={handleModelChange}>
+  <SelectTrigger id="model">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="scribe_v1">Scribe V1</SelectItem>
+    <SelectItem value="scribe_v2">Scribe V2</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  modelId: options.modelId || "scribe_v2",
+  // ... other options
+});
+```
+
+### Language Code
+
+<ParamField path="languageCode" type="string" default="undefined">
+  Optional ISO language code to improve transcription accuracy for specific languages.
+  
+  Examples: `"en"`, `"es"`, `"fr"`, `"de"`, `"ja"`, `"zh"`
+  
+  When not specified, the model will attempt to auto-detect the language.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Input
+  id="language"
+  placeholder="e.g., en, es, fr"
+  value={options.languageCode || ""}
+  onChange={handleLanguageChange}
+/>
+```
+
+**Implementation:**
+
+```tsx
+function handleLanguageChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value || undefined;
+  onOptionsChange({ ...options, languageCode: value });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  languageCode: options.languageCode || undefined,
+  // ... other options
+});
+```
+
+### Tag Audio Events
+
+<ParamField path="tagAudioEvents" type="boolean" default="false">
+  When enabled, the transcript will include tags for non-speech audio events such as laughter, applause, music, or background noise.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Checkbox
+  id="tagAudio"
+  checked={options.tagAudioEvents}
+  onCheckedChange={handleTagAudioChange}
+/>
+<Label htmlFor="tagAudio">Tag Audio Events</Label>
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  tagAudioEvents: options.tagAudioEvents || false,
+  // ... other options
+});
+```
+
+## Timestamp Options
+
+### Timestamps Granularity
+
+<ParamField path="timestampsGranularity" type="'none' | 'word' | 'character'" default="character" required>
+  Controls the level of detail for timestamp information in the transcription.
+  
+  - **none**: No timestamps included
+  - **word**: Timestamps for each word
+  - **character**: Timestamps for each character (most detailed)
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Select
+  value={options.timestampsGranularity}
+  onValueChange={handleTimestampsChange}
+>
+  <SelectTrigger id="timestamps">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="none">None</SelectItem>
+    <SelectItem value="word">Word</SelectItem>
+    <SelectItem value="character">Character</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  timestampsGranularity: options.timestampsGranularity || "character",
+  // ... other options
+});
+```
+
+<Info>
+  Character-level timestamps enable precise synchronization with audio playback and detailed alignment visualization in the transcript viewer.
+</Info>
+
+## Speaker Detection (Diarization)
+
+### Diarize
+
+<ParamField path="diarize" type="boolean" default="false">
+  Enable speaker diarization to identify and separate different speakers in the audio.
+  
+  When enabled, the transcript will include speaker labels (e.g., Speaker 1, Speaker 2) to distinguish between different voices.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Checkbox
+  id="diarize"
+  checked={options.diarize}
+  onCheckedChange={handleDiarizeChange}
+/>
+<Label htmlFor="diarize">Diarize (Speaker Detection)</Label>
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  diarize: options.diarize || false,
+  // ... other options
+});
+```
+
+### Number of Speakers
+
+<ParamField path="numSpeakers" type="number" default="undefined">
+  Specify the expected number of speakers in the audio (1-32).
+  
+  When not specified, the model will attempt to auto-detect the number of speakers.
+  
+  Providing an accurate count can improve diarization accuracy.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Input
+  id="speakers"
+  type="number"
+  min="1"
+  max="32"
+  placeholder="Auto-detect"
+  value={options.numSpeakers || ""}
+  onChange={handleNumSpeakersChange}
+/>
+```
+
+**Implementation:**
+
+```tsx
+function handleNumSpeakersChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+  const numSpeakers = value ? parseInt(value, 10) : undefined;
+  onOptionsChange({ ...options, numSpeakers });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  numSpeakers: options.numSpeakers || undefined,
+  // ... other options
+});
+```
+
+### Diarization Threshold
+
+<ParamField path="diarizationThreshold" type="number" default="undefined">
+  Fine-tune the sensitivity of speaker detection (0.0-1.0).
+  
+  - **Lower values** (closer to 0): More sensitive, may create more speaker segments
+  - **Higher values** (closer to 1): Less sensitive, may merge speakers together
+  
+  Only applies when `diarize` is `true` and `numSpeakers` is not specified.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+{options.diarize && !options.numSpeakers && (
+  <div className="space-y-2">
+    <Label htmlFor="diarization-threshold">
+      Diarization Threshold (0.0-1.0)
+    </Label>
+    <Input
+      id="diarization-threshold"
+      type="number"
+      step="0.01"
+      min="0"
+      max="1"
+      placeholder="Auto"
+      value={options.diarizationThreshold || ""}
+      onChange={handleDiarizationThresholdChange}
+    />
+  </div>
+)}
+```
+
+**Implementation:**
+
+```tsx
+function handleDiarizationThresholdChange(event: ChangeEvent<HTMLInputElement>) {
+  const value = event.target.value;
+  const diarizationThreshold = value ? parseFloat(value) : undefined;
+  onOptionsChange({ ...options, diarizationThreshold });
+}
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  diarizationThreshold: options.diarizationThreshold || undefined,
+  // ... other options
+});
+```
+
+<Note>
+  The diarization threshold field only appears in the UI when diarization is enabled and the number of speakers is not explicitly set.
+</Note>
+
+## Multi-Channel Audio
+
+### Use Multi-Channel
+
+<ParamField path="useMultiChannel" type="boolean" default="false">
+  Enable multi-channel processing for audio files with multiple channels (e.g., stereo recordings where each speaker is on a separate channel).
+  
+  When enabled, each audio channel is processed separately, which can improve accuracy for multi-channel recordings.
+</ParamField>
+
+**Usage in UI:**
+
+```tsx
+<Checkbox
+  id="multichannel"
+  checked={options.useMultiChannel}
+  onCheckedChange={handleMultiChannelChange}
+/>
+<Label htmlFor="multichannel">Multi-channel Audio</Label>
+```
+
+**API Call:**
+
+```tsx
+await browserClient.speechToText.convert({
+  useMultiChannel: options.useMultiChannel || false,
+  // ... other options
+});
+```
+
+<Tip>
+  Use multi-channel processing when you have recordings where each speaker is isolated to a specific audio channel, such as professional podcast recordings or call center recordings.
+</Tip>
+
+## Common Configurations
+
+<AccordionGroup>
+  <Accordion title="Podcast Transcription">
+    Recommended settings for podcast transcription:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      languageCode: "en",
+      tagAudioEvents: true,
+      numSpeakers: 2, // or the actual number of hosts
+      timestampsGranularity: "word",
+      diarize: true,
+      useMultiChannel: true // if each host is on a separate channel
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Interview Transcription">
+    Recommended settings for interview transcription:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      languageCode: "en",
+      tagAudioEvents: false,
+      numSpeakers: 2,
+      timestampsGranularity: "character",
+      diarize: true,
+      useMultiChannel: false
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Meeting Transcription">
+    Recommended settings for meeting transcription:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      languageCode: "en",
+      tagAudioEvents: true,
+      // numSpeakers: undefined (auto-detect)
+      timestampsGranularity: "word",
+      diarize: true,
+      diarizationThreshold: 0.5,
+      useMultiChannel: false
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Quick Transcription (No Speaker Info)">
+    Fastest transcription without speaker detection:
+    
+    ```tsx
+    {
+      modelId: "scribe_v2",
+      tagAudioEvents: false,
+      timestampsGranularity: "none",
+      diarize: false,
+      useMultiChannel: false
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Advanced Settings" icon="gears" href="/configuration/advanced-settings">
+    Configure keyterms, entity detection, temperature, and seed
+  </Card>
+  <Card title="Using the Transcript" icon="file-lines" href="/features/transcript-viewer">
+    Learn how to view and interact with your transcriptions
+  </Card>
+</CardGroup>

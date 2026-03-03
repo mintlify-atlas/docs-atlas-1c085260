@@ -1,0 +1,331 @@
+---
+title: Deploy to Vercel
+description: Deploy the ElevenLabs Speech-to-Text API UI to Vercel
+---
+
+## Overview
+
+Vercel provides seamless deployment for this project with built-in Bun support. The repository includes a `vercel.json` configuration file for optimal deployment settings.
+
+## Vercel Configuration
+
+The project includes a `vercel.json` file with the following configuration:
+
+```json
+{
+  "bunVersion": "1.x",
+  "outputDirectory": "dist"
+}
+```
+
+### Configuration Options
+
+- **bunVersion**: `"1.x"` - Ensures Vercel uses Bun 1.x for building and running the application
+- **outputDirectory**: `"dist"` - Specifies where build artifacts are located
+
+## Deployment Methods
+
+<CodeGroup>
+```bash Vercel CLI
+# Install Vercel CLI globally
+bun add -g vercel
+
+# Deploy to production
+vercel --prod
+```
+
+```bash GitHub Integration
+# 1. Push your code to GitHub
+git push origin main
+
+# 2. Import project in Vercel dashboard
+# 3. Vercel automatically deploys on push
+```
+
+```bash Manual Deploy
+# Build locally
+bun run build
+
+# Deploy the dist directory
+vercel --prod
+```
+</CodeGroup>
+
+## Step-by-Step Deployment
+
+<Steps>
+  <Step title="Install Vercel CLI">
+    Install the Vercel CLI using Bun:
+    
+    ```bash
+    bun add -g vercel
+    ```
+    
+    Or using npm:
+    
+    ```bash
+    npm install -g vercel
+    ```
+  </Step>
+
+  <Step title="Login to Vercel">
+    Authenticate with your Vercel account:
+    
+    ```bash
+    vercel login
+    ```
+  </Step>
+
+  <Step title="Deploy the project">
+    From your project root directory:
+    
+    ```bash
+    vercel
+    ```
+    
+    For production deployment:
+    
+    ```bash
+    vercel --prod
+    ```
+    
+    The Vercel CLI will:
+    - Detect the Bun runtime from `vercel.json`
+    - Install dependencies using `bun install`
+    - Run `bun run build` automatically
+    - Deploy the `dist/` directory
+  </Step>
+
+  <Step title="Access your deployment">
+    Vercel will provide a URL for your deployment:
+    
+    ```
+    ✅ Production: https://your-project.vercel.app
+    ```
+  </Step>
+</Steps>
+
+## GitHub Integration
+
+<Steps>
+  <Step title="Push to GitHub">
+    Ensure your code is in a GitHub repository:
+    
+    ```bash
+    git init
+    git add .
+    git commit -m "Initial commit"
+    git remote add origin https://github.com/username/repo.git
+    git push -u origin main
+    ```
+  </Step>
+
+  <Step title="Import in Vercel">
+    1. Go to [vercel.com](https://vercel.com)
+    2. Click "Add New" → "Project"
+    3. Import your GitHub repository
+    4. Vercel auto-detects the configuration from `vercel.json`
+  </Step>
+
+  <Step title="Configure project settings">
+    Vercel should automatically detect:
+    - **Framework Preset**: Other
+    - **Build Command**: `bun run build`
+    - **Output Directory**: `dist`
+    - **Install Command**: `bun install`
+    
+    No environment variables are needed.
+  </Step>
+
+  <Step title="Deploy">
+    Click "Deploy" and Vercel will:
+    - Clone your repository
+    - Install dependencies with Bun
+    - Run the build command
+    - Deploy your application
+  </Step>
+</Steps>
+
+## Automatic Deployments
+
+Once connected to GitHub, Vercel automatically:
+
+- **Production deployments**: Every push to `main` branch
+- **Preview deployments**: Every pull request
+- **Instant rollbacks**: Previous deployments remain accessible
+
+### Branch Deployments
+
+```bash
+# Push to main → production deployment
+git push origin main
+
+# Create PR → preview deployment
+git checkout -b feature-branch
+git push origin feature-branch
+# Open PR on GitHub → automatic preview URL
+```
+
+## Build Configuration
+
+Vercel uses the following commands (automatically detected):
+
+| Command | Value |
+|---------|-------|
+| Install Command | `bun install` |
+| Build Command | `bun run build` |
+| Output Directory | `dist` |
+| Development Command | `bun run dev` |
+
+## Custom Domain
+
+To add a custom domain:
+
+<Steps>
+  <Step title="Open project settings">
+    Navigate to your project in the Vercel dashboard
+  </Step>
+
+  <Step title="Add domain">
+    Go to Settings → Domains → Add domain
+  </Step>
+
+  <Step title="Configure DNS">
+    Follow Vercel's instructions to configure your DNS records:
+    
+    ```
+    Type: CNAME
+    Name: www
+    Value: cname.vercel-dns.com
+    ```
+  </Step>
+
+  <Step title="Verify domain">
+    Vercel will automatically issue an SSL certificate once DNS propagates
+  </Step>
+</Steps>
+
+## Environment Variables
+
+<Info>
+  This project doesn't require environment variables. The ElevenLabs API key is entered by users in the UI.
+</Info>
+
+If you need to add custom environment variables:
+
+1. Go to Project Settings → Environment Variables
+2. Add your variables
+3. Redeploy the project
+
+## Troubleshooting
+
+### Build Fails on Vercel
+
+Ensure `vercel.json` is present and correctly configured:
+
+```json
+{
+  "bunVersion": "1.x",
+  "outputDirectory": "dist"
+}
+```
+
+### Wrong Node.js Version
+
+If Vercel uses Node.js instead of Bun, verify:
+- `vercel.json` includes `"bunVersion": "1.x"`
+- The file is in your repository root
+- You've redeployed after adding the file
+
+### Missing Build Output
+
+If deployment succeeds but the site is blank:
+- Verify `outputDirectory` is set to `"dist"`
+- Check that `bun run build` creates files in the `dist/` folder
+- Review build logs in Vercel dashboard
+
+### Dependencies Not Installing
+
+Ensure `package.json` and `bun.lockb` are committed:
+
+```bash
+git add package.json bun.lockb
+git commit -m "Add lock file"
+git push
+```
+
+## Performance Optimization
+
+Vercel automatically provides:
+
+- **Edge Network**: Global CDN for fast content delivery
+- **Automatic HTTPS**: SSL certificates for all deployments
+- **Compression**: Gzip and Brotli compression
+- **Caching**: Intelligent caching of static assets
+
+### Build Cache
+
+Vercel caches `node_modules` (or in this case, Bun's cache) between builds for faster deployments.
+
+## Monitoring
+
+Vercel provides built-in analytics:
+
+1. Go to your project dashboard
+2. Navigate to the Analytics tab
+3. View:
+   - Page views
+   - Traffic sources
+   - Performance metrics
+   - Real user monitoring
+
+## Preview Deployments
+
+Every git push creates a unique preview URL:
+
+```bash
+git checkout -b new-feature
+git push origin new-feature
+# Preview URL: https://your-project-git-new-feature-username.vercel.app
+```
+
+Preview deployments:
+- Don't affect production
+- Have unique URLs
+- Perfect for testing
+- Automatically commented on PRs
+
+## CLI Commands Reference
+
+```bash
+# Deploy to preview
+vercel
+
+# Deploy to production
+vercel --prod
+
+# List deployments
+vercel ls
+
+# View deployment logs
+vercel logs <deployment-url>
+
+# Remove deployment
+vercel rm <deployment-url>
+
+# Open project in browser
+vercel open
+```
+
+## Next Steps
+
+After deploying to Vercel:
+
+1. Share your deployment URL with users
+2. Configure a custom domain (optional)
+3. Set up GitHub integration for automatic deployments
+4. Monitor analytics in the Vercel dashboard
+
+<Check>
+  Your ElevenLabs Speech-to-Text API UI is now live on Vercel! Users can access it and enter their own API keys to start transcribing audio.
+</Check>

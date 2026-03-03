@@ -1,0 +1,121 @@
+---
+title: 'API Setup'
+description: 'Configure your ElevenLabs API key for Speech-to-Text transcription'
+---
+
+## Getting Your API Key
+
+To use the ElevenLabs Speech-to-Text Playground, you need an ElevenLabs API key. This key authenticates your requests to the Scribe API.
+
+### Where to Find Your API Key
+
+1. Sign up or log in to your [ElevenLabs account](https://elevenlabs.io)
+2. Navigate to your account settings or API section
+3. Copy your API key
+
+<Warning>
+  Never share your API key publicly or commit it to version control. Keep it secure and private.
+</Warning>
+
+## Using Your API Key
+
+The playground requires you to enter your API key in the transcription form before you can process audio files.
+
+### In the UI
+
+The API key is entered through a password-protected input field:
+
+```tsx
+<Input
+  id="apiKey"
+  type="password"
+  placeholder="Enter your API key"
+  value={apiKey}
+  onChange={handleApiKeyChange}
+  required
+/>
+```
+
+The key is stored in component state and used to initialize the ElevenLabs client:
+
+```tsx
+const browserClient = new ElevenLabsClient({ apiKey });
+```
+
+### API Client Initialization
+
+When you submit a transcription request, the playground creates an ElevenLabs client with your API key:
+
+```tsx
+const browserClient = new ElevenLabsClient({ apiKey });
+const transcriptResponse = await browserClient.speechToText.convert({
+  file,
+  modelId: options.modelId || "scribe_v2",
+  languageCode: options.languageCode || undefined,
+  // ... other options
+});
+```
+
+<Info>
+  The API key is only stored in browser memory during your session. It is never persisted to local storage or sent anywhere except to the ElevenLabs API.
+</Info>
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="How is the API key stored?">
+    The API key is stored in React component state during your session. It is never:
+    - Saved to local storage
+    - Saved to cookies
+    - Persisted between page refreshes
+    - Sent to any third-party services
+    
+    You must re-enter your API key each time you reload the page.
+  </Accordion>
+
+  <Accordion title="What if my API key is compromised?">
+    If you believe your API key has been compromised:
+    1. Immediately regenerate your API key in your ElevenLabs account
+    2. Update any applications using the old key
+    3. Review your API usage logs for unauthorized activity
+  </Accordion>
+
+  <Accordion title="Can I use environment variables?">
+    This is a client-side application that runs in your browser. For security reasons, you should not embed API keys in environment variables that get bundled into client-side code.
+    
+    If you're deploying this application, consider implementing a backend proxy that securely stores and uses the API key on behalf of the frontend.
+  </Accordion>
+</AccordionGroup>
+
+## Error Handling
+
+If your API key is invalid or expired, you'll receive an error message when attempting to transcribe:
+
+```tsx
+try {
+  const browserClient = new ElevenLabsClient({ apiKey });
+  const transcriptResponse = await browserClient.speechToText.convert({
+    // ... options
+  });
+} catch (err: unknown) {
+  const apiErrorMessage = getElevenLabsErrorMessage(err);
+  const fallbackMessage = err instanceof Error ? err.message : "An error occurred";
+  setError(apiErrorMessage ?? fallbackMessage);
+}
+```
+
+Common API key errors:
+- **401 Unauthorized**: Invalid or missing API key
+- **403 Forbidden**: API key doesn't have permission for this operation
+- **429 Too Many Requests**: Rate limit exceeded for your API key
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Transcription Options" icon="sliders" href="/configuration/transcription-options">
+    Configure model, language, timestamps, and speaker detection
+  </Card>
+  <Card title="Advanced Settings" icon="gears" href="/configuration/advanced-settings">
+    Set up keyterms, entity detection, temperature, and seed
+  </Card>
+</CardGroup>

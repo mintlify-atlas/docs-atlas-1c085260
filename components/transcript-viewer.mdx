@@ -1,0 +1,477 @@
+---
+title: "Transcript Viewer"
+description: "Interactive transcript viewer components with audio synchronization and word-level highlighting"
+---
+
+The Transcript Viewer provides a complete system for displaying synchronized transcripts with audio playback. It uses a context provider pattern to share state between components.
+
+## Overview
+
+The transcript viewer system consists of:
+
+- **TranscriptViewerContainer** - Root component that manages state and provides context
+- **TranscriptViewerWords** - Renders the transcript with word-level highlighting
+- **TranscriptViewerAudio** - Audio element with synchronized playback
+- **TranscriptViewerPlayPauseButton** - Play/pause control button
+- **TranscriptViewerScrubBar** - Timeline scrubber for navigation
+
+All components use the `useTranscriptViewerContext` hook internally to access shared state.
+
+## Basic Usage
+
+```tsx
+import {
+  TranscriptViewerContainer,
+  TranscriptViewerWords,
+  TranscriptViewerAudio,
+  TranscriptViewerPlayPauseButton,
+  TranscriptViewerScrubBar,
+} from "@/features/transcript-view/transcript-viewer";
+
+function TranscriptDemo({ alignment, audioUrl }) {
+  return (
+    <TranscriptViewerContainer
+      alignment={alignment}
+      audioSrc={audioUrl}
+      audioType="audio/mpeg"
+    >
+      <TranscriptViewerPlayPauseButton />
+      <TranscriptViewerWords />
+      <TranscriptViewerScrubBar />
+      <TranscriptViewerAudio />
+    </TranscriptViewerContainer>
+  );
+}
+```
+
+## TranscriptViewerContainer
+
+The root component that initializes the transcript viewer state and provides context to child components.
+
+### Props
+
+<ParamField path="audioSrc" type="string" required>
+  URL or path to the audio file
+</ParamField>
+
+<ParamField path="audioType" type="AudioType" required>
+  MIME type of the audio file. Supported types:
+  - `"audio/mpeg"`
+  - `"audio/wav"`
+  - `"audio/ogg"`
+  - `"audio/mp3"`
+  - `"audio/m4a"`
+  - `"audio/aac"`
+  - `"audio/webm"`
+</ParamField>
+
+<ParamField path="alignment" type="CharacterAlignmentResponseModel" required>
+  Character-level alignment data from ElevenLabs Speech-to-Text API. Contains:
+  - `characters` - Array of individual characters
+  - `characterStartTimesSeconds` - Start time for each character
+  - `characterEndTimesSeconds` - End time for each character
+</ParamField>
+
+<ParamField path="segmentComposer" type="SegmentComposer" default="composeSegments">
+  Custom function to compose transcript segments from alignment data. If not provided, uses the default `composeSegments` function.
+  
+  ```tsx
+  type SegmentComposer = (
+    alignment: CharacterAlignmentResponseModel
+  ) => ComposeSegmentsResult;
+  ```
+</ParamField>
+
+<ParamField path="hideAudioTags" type="boolean" default="true">
+  Whether to hide audio tags (e.g., `[music]`, `[applause]`) from the transcript display
+</ParamField>
+
+<ParamField path="onPlay" type="() => void">
+  Callback invoked when audio playback starts
+</ParamField>
+
+<ParamField path="onPause" type="() => void">
+  Callback invoked when audio playback pauses
+</ParamField>
+
+<ParamField path="onTimeUpdate" type="(time: number) => void">
+  Callback invoked when audio time updates. Receives the current time in seconds.
+</ParamField>
+
+<ParamField path="onEnded" type="() => void">
+  Callback invoked when audio playback ends
+</ParamField>
+
+<ParamField path="onDurationChange" type="(duration: number) => void">
+  Callback invoked when audio duration is loaded or changes. Receives the duration in seconds.
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes for the container div
+</ParamField>
+
+### Example with Callbacks
+
+```tsx
+<TranscriptViewerContainer
+  alignment={alignment}
+  audioSrc="/audio/speech.mp3"
+  audioType="audio/mpeg"
+  hideAudioTags={true}
+  onPlay={() => console.log("Started playing")}
+  onPause={() => console.log("Paused")}
+  onTimeUpdate={(time) => console.log("Current time:", time)}
+  onEnded={() => console.log("Playback ended")}
+  onDurationChange={(duration) => console.log("Duration:", duration)}
+>
+  {/* Child components */}
+</TranscriptViewerContainer>
+```
+
+## TranscriptViewerWords
+
+Renders the transcript text with automatic word-level highlighting synchronized to audio playback.
+
+### Props
+
+<ParamField path="renderWord" type="(props) => ReactNode">
+  Custom render function for individual words. Receives:
+  
+  ```tsx
+  {
+    word: TranscriptWord;
+    status: "spoken" | "unspoken" | "current";
+  }
+  ```
+</ParamField>
+
+<ParamField path="renderGap" type="(props) => ReactNode">
+  Custom render function for gaps (whitespace/punctuation). Receives:
+  
+  ```tsx
+  {
+    segment: GapSegment;
+    status: "spoken" | "unspoken" | "current";
+  }
+  ```
+</ParamField>
+
+<ParamField path="wordClassNames" type="string">
+  Additional CSS classes for word spans
+</ParamField>
+
+<ParamField path="gapClassNames" type="string">
+  Additional CSS classes for gap spans
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes for the container div
+</ParamField>
+
+### Default Styling
+
+By default, words are styled based on their status:
+- **Spoken** - `text-muted-foreground` (already played)
+- **Current** - `text-primary font-semibold` (currently playing)
+- **Unspoken** - `text-foreground` (not yet played)
+
+### Custom Word Rendering
+
+```tsx
+<TranscriptViewerWords
+  renderWord={({ word, status }) => (
+    <span
+      className={{
+        spoken: "opacity-50",
+        current: "text-blue-600 font-bold underline",
+        unspoken: "text-gray-900",
+      }[status]}
+    >
+      {word.text}
+    </span>
+  )}
+  renderGap={({ segment }) => (
+    <span className="text-gray-400">{segment.text}</span>
+  )}
+/>
+```
+
+### Word Status Logic
+
+The component automatically determines word status based on:
+- `spokenSegments` - All segments before the current word
+- `currentWord` - The word currently being spoken
+- `unspokenSegments` - All segments after the current word
+
+When playback reaches the end (`currentTime >= duration - 0.01`), all words are marked as "spoken".
+
+## TranscriptViewerAudio
+
+Renders the HTML5 audio element connected to the transcript viewer state.
+
+### Props
+
+Accepts all standard HTML `<audio>` element props except `children` and `src`, which are managed internally.
+
+### Example
+
+```tsx
+<TranscriptViewerAudio
+  className="hidden" // Hide the audio element
+  preload="auto"
+/>
+```
+
+<Note>
+  The audio element is automatically connected to the viewer state. You don't need to manually manage refs or event listeners.
+</Note>
+
+## TranscriptViewerPlayPauseButton
+
+A button that toggles audio playback state.
+
+### Props
+
+<ParamField path="children" type="ReactNode | ((state) => ReactNode)">
+  Button content. Can be:
+  - A static ReactNode
+  - A render function that receives `{ isPlaying: boolean }`
+  
+  Default: Play/Pause icons from `lucide-react`
+</ParamField>
+
+Also accepts all props from the `Button` component except `onClick` is augmented.
+
+### Examples
+
+```tsx
+// Default icons
+<TranscriptViewerPlayPauseButton />
+
+// Custom static content
+<TranscriptViewerPlayPauseButton>
+  Toggle Playback
+</TranscriptViewerPlayPauseButton>
+
+// Custom render function
+<TranscriptViewerPlayPauseButton>
+  {({ isPlaying }) => (
+    <>
+      {isPlaying ? (
+        <><PauseIcon /> Pause</>
+      ) : (
+        <><PlayIcon /> Play</>
+      )}
+    </>
+  )}
+</TranscriptViewerPlayPauseButton>
+
+// With custom styling
+<TranscriptViewerPlayPauseButton
+  variant="outline"
+  size="lg"
+  className="w-full"
+/>
+```
+
+## TranscriptViewerScrubBar
+
+An interactive timeline scrubber for navigating through the audio.
+
+### Props
+
+<ParamField path="showTimeLabels" type="boolean" default="true">
+  Whether to display current time and duration labels below the scrub bar
+</ParamField>
+
+<ParamField path="labelsClassName" type="string">
+  CSS classes for the time labels container
+</ParamField>
+
+<ParamField path="trackClassName" type="string">
+  CSS classes for the scrub bar track
+</ParamField>
+
+<ParamField path="progressClassName" type="string">
+  CSS classes for the progress indicator
+</ParamField>
+
+<ParamField path="thumbClassName" type="string">
+  CSS classes for the draggable thumb
+</ParamField>
+
+<ParamField path="className" type="string">
+  CSS classes for the scrub bar container
+</ParamField>
+
+### Example
+
+```tsx
+<TranscriptViewerScrubBar
+  showTimeLabels={true}
+  trackClassName="h-2 bg-gray-200"
+  progressClassName="bg-blue-500"
+  thumbClassName="w-4 h-4 bg-white border-2 border-blue-500"
+/>
+```
+
+### Behavior
+
+- **Click** - Seek to clicked position
+- **Drag** - Scrub through audio timeline
+- **During scrubbing** - Animation frame updates are paused for smooth interaction
+- **After scrubbing** - Animation frame updates resume if audio is playing
+
+## Context Provider Pattern
+
+The transcript viewer uses React Context to share state between components:
+
+```tsx
+// Internal implementation
+const TranscriptViewerContext = createContext<TranscriptViewerContextValue | null>(null);
+
+function useTranscriptViewerContext() {
+  const context = useContext(TranscriptViewerContext);
+  if (!context) {
+    throw new Error(
+      "useTranscriptViewerContext must be used within a TranscriptViewer"
+    );
+  }
+  return context;
+}
+```
+
+### Context Value
+
+The context provides:
+
+<ResponseField name="segments" type="TranscriptSegment[]">
+  All transcript segments (words and gaps)
+</ResponseField>
+
+<ResponseField name="words" type="TranscriptWord[]">
+  Only the word segments (excludes gaps)
+</ResponseField>
+
+<ResponseField name="spokenSegments" type="TranscriptSegment[]">
+  Segments that have been played
+</ResponseField>
+
+<ResponseField name="unspokenSegments" type="TranscriptSegment[]">
+  Segments that haven't been played yet
+</ResponseField>
+
+<ResponseField name="currentWord" type="TranscriptWord | null">
+  The word currently being spoken
+</ResponseField>
+
+<ResponseField name="currentSegmentIndex" type="number">
+  Index of the current segment (-1 if none)
+</ResponseField>
+
+<ResponseField name="currentWordIndex" type="number">
+  Index of the current word (-1 if none)
+</ResponseField>
+
+<ResponseField name="isPlaying" type="boolean">
+  Whether audio is currently playing
+</ResponseField>
+
+<ResponseField name="isScrubbing" type="boolean">
+  Whether user is actively scrubbing the timeline
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Total audio duration in seconds
+</ResponseField>
+
+<ResponseField name="currentTime" type="number">
+  Current playback time in seconds
+</ResponseField>
+
+<ResponseField name="audioRef" type="RefObject<HTMLAudioElement>">
+  Reference to the audio element
+</ResponseField>
+
+<ResponseField name="audioProps" type="object">
+  Props to spread onto the audio element
+</ResponseField>
+
+<ResponseField name="play" type="() => void">
+  Start audio playback
+</ResponseField>
+
+<ResponseField name="pause" type="() => void">
+  Pause audio playback
+</ResponseField>
+
+<ResponseField name="seekToTime" type="(time: number) => void">
+  Seek to a specific time in seconds
+</ResponseField>
+
+<ResponseField name="seekToWord" type="(word: number | TranscriptWord) => void">
+  Seek to the start of a specific word (by index or word object)
+</ResponseField>
+
+<ResponseField name="startScrubbing" type="() => void">
+  Called when user starts scrubbing
+</ResponseField>
+
+<ResponseField name="endScrubbing" type="() => void">
+  Called when user stops scrubbing
+</ResponseField>
+
+## Complete Example
+
+```tsx
+import { useState } from "react";
+import {
+  TranscriptViewerContainer,
+  TranscriptViewerWords,
+  TranscriptViewerAudio,
+  TranscriptViewerPlayPauseButton,
+  TranscriptViewerScrubBar,
+} from "@/features/transcript-view/transcript-viewer";
+
+function TranscriptPlayer({ alignment, audioUrl }) {
+  const [playCount, setPlayCount] = useState(0);
+
+  return (
+    <TranscriptViewerContainer
+      alignment={alignment}
+      audioSrc={audioUrl}
+      audioType="audio/mpeg"
+      hideAudioTags={true}
+      onPlay={() => setPlayCount((c) => c + 1)}
+      className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow"
+    >
+      <div className="flex items-center gap-4 mb-4">
+        <TranscriptViewerPlayPauseButton
+          variant="default"
+          size="lg"
+        />
+        <div className="text-sm text-muted-foreground">
+          Plays: {playCount}
+        </div>
+      </div>
+
+      <TranscriptViewerWords
+        className="mb-6 text-lg leading-relaxed"
+        wordClassNames="cursor-pointer hover:underline"
+      />
+
+      <TranscriptViewerScrubBar
+        showTimeLabels={true}
+        className="mb-4"
+      />
+
+      <TranscriptViewerAudio className="hidden" />
+    </TranscriptViewerContainer>
+  );
+}
+```
+
+## See Also
+
+- [useTranscriptViewer Hook](/components/transcript-hooks) - Lower-level hook for custom implementations
+- [Word Alignment](/components/word-alignment) - Understanding the alignment system

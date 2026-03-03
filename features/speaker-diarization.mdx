@@ -1,0 +1,283 @@
+---
+title: Speaker Diarization
+description: Detect and identify multiple speakers in audio files with ElevenLabs Speech-to-Text
+---
+
+## Overview
+
+Speaker diarization automatically detects and separates different speakers in an audio file. This feature is essential for transcribing meetings, interviews, podcasts, and any multi-speaker content.
+
+## Enabling Diarization
+
+To enable speaker detection, set the `diarize` option to `true`:
+
+```typescript
+const options: TranscriptOptions = {
+  modelId: "scribe_v2",
+  timestampsGranularity: "character",
+  diarize: true,  // Enable speaker detection
+  // ... other options
+};
+```
+
+## Configuration Options
+
+### Number of Speakers
+
+You can specify the expected number of speakers, or let the API auto-detect:
+
+<Tabs>
+  <Tab title="Auto-detect">
+    Leave `numSpeakers` undefined to automatically detect the number of speakers:
+    
+    ```typescript
+    diarize: true,
+    numSpeakers: undefined  // Auto-detect
+    ```
+  </Tab>
+  
+  <Tab title="Fixed Count">
+    Specify the exact number of speakers (1-32):
+    
+    ```typescript
+    diarize: true,
+    numSpeakers: 3  // Expect 3 speakers
+    ```
+    
+    This can improve accuracy when you know the speaker count in advance.
+  </Tab>
+</Tabs>
+
+### Diarization Threshold
+
+When auto-detecting speakers, you can control the sensitivity with `diarizationThreshold`:
+
+```typescript
+diarize: true,
+numSpeakers: undefined,
+diarizationThreshold: 0.6  // Range: 0.0-1.0
+```
+
+- **Lower values** (e.g., 0.3): More speakers detected, may split single speaker
+- **Higher values** (e.g., 0.8): Fewer speakers detected, may merge different speakers
+- **Default**: API determines optimal threshold
+
+<Note>
+  The `diarizationThreshold` option only applies when `numSpeakers` is not specified. If you provide a fixed speaker count, this threshold is ignored.
+</Note>
+
+## UI Implementation
+
+The transcription form includes conditional rendering for the diarization threshold input:
+
+```typescript
+{options.diarize && !options.numSpeakers && (
+  <div className="space-y-2">
+    <Label htmlFor="diarization-threshold">
+      Diarization Threshold (0.0-1.0)
+    </Label>
+    <Input
+      id="diarization-threshold"
+      type="number"
+      step="0.01"
+      min="0"
+      max="1"
+      placeholder="Auto"
+      value={options.diarizationThreshold || ""}
+      onChange={handleDiarizationThresholdChange}
+    />
+  </div>
+)}
+```
+
+This input only appears when:
+1. Diarization is enabled (`options.diarize === true`)
+2. Speaker count is not fixed (`!options.numSpeakers`)
+
+## Working with Speaker Data
+
+Each word in the transcript includes speaker information:
+
+```typescript
+type TranscriptWord = {
+  text: string;
+  start: number;
+  end: number;
+  speakerId?: string;  // e.g., "speaker_0", "speaker_1"
+  // ... other fields
+};
+```
+
+### Extracting Unique Speakers
+
+Get all unique speakers from a transcript:
+
+```typescript
+export function getUniqueSpeakers(words: TranscriptWord[]): string[] {
+  const speakers = new Set<string>();
+  words.forEach((word) => {
+    if (word.speakerId) {
+      speakers.add(word.speakerId);
+    }
+  });
+  return Array.from(speakers).sort();
+}
+```
+
+### Speaker Name Mapping
+
+The application allows users to assign custom names to detected speakers:
+
+```typescript
+type SpeakerNames = Record<string, string>;
+
+// Example:
+const speakerNames: SpeakerNames = {
+  "speaker_0": "Alice",
+  "speaker_1": "Bob",
+  "speaker_2": "Charlie"
+};
+```
+
+Users can update speaker names dynamically:
+
+```typescript
+function handleSpeakerNameChange(speakerId: string, newName: string) {
+  setSpeakerNames((prev) => ({
+    ...prev,
+    [speakerId]: newName,
+  }));
+}
+```
+
+## Transcript Export with Speakers
+
+The application can generate markdown transcripts with speaker labels:
+
+```typescript
+export function buildTranscriptMarkdown(
+  words: TranscriptWord[],
+  options: {
+    includeTimestamps: boolean;
+    includeSpeakers: boolean;
+    getSpeakerName: (speakerId: string) => string;
+  }
+): string {
+  let markdown = "# Transcript\n\n";
+  let currentSpeaker: string | undefined;
+  let currentParagraph: MarkdownWord[] = [];
+
+  function flushParagraph() {
+    if (currentParagraph.length === 0) return;
+
+    if (options.includeSpeakers && currentSpeaker) {
+      markdown += `**${options.getSpeakerName(currentSpeaker)}:** `;
+    }
+
+    markdown += currentParagraph.map((word) => word.text).join("");
+
+    if (
+      options.includeTimestamps &&
+      currentParagraph[0] &&
+      currentParagraph[0].time !== undefined
+    ) {
+      markdown += ` _(${formatTimestamp(currentParagraph[0].time)})_`;
+    }
+
+    markdown += "\n\n";
+    currentParagraph = [];
+  }
+
+  words.forEach((word) => {
+    if (word.type === "word") {
+      const hasSpeakerChanged =
+        word.speakerId && word.speakerId !== currentSpeaker;
+      if (hasSpeakerChanged) {
+        flushParagraph();
+        currentSpeaker = word.speakerId;
+      }
+
+      currentParagraph.push({
+        text: word.text,
+        time: word.start,
+      });
+    } else if (word.type === "spacing") {
+      if (currentParagraph.length > 0) {
+        currentParagraph.push({ text: word.text });
+      }
+    }
+  });
+
+  flushParagraph();
+  return markdown;
+}
+```
+
+### Example Output
+
+With speaker detection enabled, the markdown output looks like:
+
+```markdown
+# Transcript
+
+**Alice:** Hello everyone, welcome to today's meeting. _(0:00)_
+
+**Bob:** Thanks for having me. I'd like to discuss the new features. _(0:05)_
+
+**Alice:** Great! Let's start with the transcription API. _(0:12)_
+```
+
+## Multi-Channel Audio
+
+For recordings with separate audio channels per speaker (e.g., professional studio recordings):
+
+```typescript
+diarize: true,
+useMultiChannel: true  // Process channels separately
+```
+
+<Warning>
+  Multi-channel processing requires audio files where each speaker is recorded on a separate channel. This is different from stereo audio where both channels contain mixed audio.
+</Warning>
+
+## UI Controls
+
+The transcription form includes checkboxes for diarization controls:
+
+```tsx
+<div className="flex items-center space-x-2">
+  <Checkbox
+    id="diarize"
+    checked={options.diarize}
+    onCheckedChange={handleDiarizeChange}
+  />
+  <Label htmlFor="diarize" className="cursor-pointer">
+    Diarize (Speaker Detection)
+  </Label>
+</div>
+
+<div className="flex items-center space-x-2">
+  <Checkbox
+    id="multichannel"
+    checked={options.useMultiChannel}
+    onCheckedChange={handleMultiChannelChange}
+  />
+  <Label htmlFor="multichannel" className="cursor-pointer">
+    Multi-channel Audio
+  </Label>
+</div>
+```
+
+## Best Practices
+
+1. **Use fixed speaker count** when you know it in advance for better accuracy
+2. **Adjust threshold** based on audio quality and speaker similarity
+3. **Enable multi-channel** only for properly recorded multi-track audio
+4. **Label speakers** with recognizable names for better readability
+5. **Test different thresholds** if auto-detection merges or splits speakers incorrectly
+
+## Next Steps
+
+- View speaker-labeled transcripts in the [Transcript Viewer](/features/transcript-viewer)
+- Export transcripts with speaker names using the [Audio Playback](/features/audio-playback) controls
+- Learn about [Transcription](/features/transcription) options

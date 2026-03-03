@@ -1,0 +1,160 @@
+---
+title: 'Components Overview'
+description: 'Architecture overview and component hierarchy of the ElevenLabs Speech-to-Text API UI'
+---
+
+## Architecture Overview
+
+The ElevenLabs Speech-to-Text API UI is built with a modular React architecture using TypeScript. The application follows a feature-based structure with reusable UI components powered by shadcn/ui.
+
+## Component Hierarchy
+
+The application has a clear component hierarchy starting from the root:
+
+```
+App.tsx
+└── SpeechToTextPlayground
+    ├── TranscriptionForm
+    │   ├── Card (UI)
+    │   ├── Input (UI)
+    │   ├── Select (UI)
+    │   ├── Checkbox (UI)
+    │   ├── Textarea (UI)
+    │   └── Button (UI)
+    └── TranscriptionResult
+        ├── Card (UI)
+        ├── Select (UI)
+        ├── Input (UI)
+        └── TranscriptViewerContainer
+            ├── TranscriptViewerAudio
+            ├── TranscriptViewerWords
+            ├── TranscriptViewerScrubBar
+            └── TranscriptViewerPlayPauseButton
+```
+
+## Directory Structure
+
+The source code is organized into two main feature directories:
+
+### Speech-to-Text Playground Feature
+
+Location: `src/features/speech-to-text-playground/`
+
+- **speech-to-text-playground.tsx** - Main container component that orchestrates the transcription workflow
+- **transcription-form.tsx** - Form component for API key, file upload, and configuration options
+- **transcription-result.tsx** - Result display component with interactive transcript viewer
+- **speech-to-text-types.ts** - TypeScript type definitions for the feature
+- **transcript-utils.ts** - Utility functions for transcript processing and formatting
+
+### Transcript View Feature
+
+Location: `src/features/transcript-view/`
+
+- **transcript-viewer.tsx** - Context-based transcript viewer component system
+- **use-transcript-viewer.ts** - Custom hook for transcript playback state management
+- **segment-composer.ts** - Logic for composing transcript segments
+- **word-index.ts** - Word indexing utilities for alignment
+- **transcript-types.ts** - TypeScript type definitions for transcript data
+
+### UI Components
+
+Location: `src/components/ui/`
+
+Reusable UI components based on shadcn/ui:
+
+- **button.tsx** - Button component with variants
+- **card.tsx** - Card container with header, content, and description
+- **checkbox.tsx** - Checkbox input component
+- **input.tsx** - Text input component
+- **label.tsx** - Form label component
+- **select.tsx** - Dropdown select component
+- **textarea.tsx** - Multi-line text input
+- **progress.tsx** - Progress bar component
+- **skeleton.tsx** - Loading skeleton component
+- **scrub-bar.tsx** - Custom audio scrubbing component
+- **transcript-viewer.tsx** - Duplicate transcript viewer (also in features/transcript-view)
+
+## Major Components
+
+<CardGroup cols={2}>
+  <Card title="App" icon="square-terminal" href="/components/app">
+    Root application component that renders the SpeechToTextPlayground
+  </Card>
+  <Card title="SpeechToTextPlayground" icon="gamepad-2" href="/components/speech-to-text-playground">
+    Main container managing state and orchestrating the transcription workflow
+  </Card>
+  <Card title="TranscriptionForm" icon="file-input" href="/components/transcription-form">
+    Form for API authentication, file upload, and transcription configuration
+  </Card>
+  <Card title="TranscriptionResult" icon="file-check" href="/components/transcription-result">
+    Displays transcription results with interactive playback controls
+  </Card>
+  <Card title="TranscriptViewer" icon="captions" href="/components/transcript-viewer">
+    Context-based viewer system for synchronized transcript playback
+  </Card>
+  <Card title="UI Components" icon="component" href="/components/ui-components">
+    Reusable UI primitives based on shadcn/ui design system
+  </Card>
+</CardGroup>
+
+## Component Composition
+
+The application uses a composition pattern where:
+
+1. **App.tsx** serves as the entry point and renders the main playground
+2. **SpeechToTextPlayground** acts as the state container, managing:
+   - API key authentication
+   - File selection and validation
+   - Transcription options and configuration
+   - Transcription API calls via ElevenLabs SDK
+   - Result state and error handling
+
+3. **TranscriptionForm** handles all user inputs:
+   - API key (password input)
+   - Audio/video file upload with validation
+   - Model selection (Scribe V1/V2)
+   - Language code and timestamps granularity
+   - Speaker diarization settings
+   - Advanced options (temperature, seed, keyterms, etc.)
+
+4. **TranscriptionResult** displays the output:
+   - Language detection with confidence score
+   - Speaker name customization
+   - Multiple copy formats (plain text, markdown variants)
+   - Interactive transcript viewer with audio synchronization
+
+5. **TranscriptViewer** provides playback features:
+   - Word-level highlighting synchronized with audio
+   - Scrubbing controls for navigation
+   - Play/pause functionality
+   - Segment composition for audio tags and gaps
+
+## Data Flow
+
+The application follows a unidirectional data flow:
+
+1. User inputs are captured in `TranscriptionForm`
+2. Form submission triggers the API call in `SpeechToTextPlayground`
+3. API response is processed using `transcript-utils.ts` helpers
+4. Converted data is passed to `TranscriptionResult`
+5. `TranscriptViewerContainer` provides context to child viewer components
+6. User interactions (play, pause, scrub) update the viewer state via hooks
+
+## Key Features
+
+- **Type Safety**: Full TypeScript coverage with strict type definitions
+- **State Management**: React hooks for local state, context for shared viewer state
+- **Error Handling**: ElevenLabs API error parsing and user-friendly messages
+- **Audio Sync**: Character-level alignment for precise word highlighting
+- **Speaker Diarization**: Support for multi-speaker detection and labeling
+- **Responsive Design**: Mobile-friendly layout with Tailwind CSS
+- **Accessibility**: Semantic HTML and ARIA-compliant components
+
+## Next Steps
+
+Explore detailed documentation for each component:
+
+- Learn how [SpeechToTextPlayground](/components/speech-to-text-playground) orchestrates the workflow
+- Understand [TranscriptionForm](/components/transcription-form) configuration options
+- Discover [TranscriptViewer](/components/transcript-viewer) implementation details
+- Review [UI Components](/components/ui/scrub-bar) for design system usage

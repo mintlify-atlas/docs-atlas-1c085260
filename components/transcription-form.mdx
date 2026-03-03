@@ -1,0 +1,315 @@
+---
+title: TranscriptionForm
+description: Form component for configuring and submitting speech-to-text transcription requests
+---
+
+The `TranscriptionForm` component provides a comprehensive UI for configuring all ElevenLabs Speech-to-Text API options, handling file uploads, and submitting transcription requests.
+
+## Component Props
+
+<ParamField path="apiKey" type="string" required>
+  ElevenLabs API key for authentication
+</ParamField>
+
+<ParamField path="file" type="File | null" required>
+  Selected audio or video file for transcription
+</ParamField>
+
+<ParamField path="options" type="TranscriptOptions" required>
+  Current transcription configuration options
+</ParamField>
+
+<ParamField path="isTranscribing" type="boolean" required>
+  Loading state indicating if transcription is in progress
+</ParamField>
+
+<ParamField path="error" type="string | null" required>
+  Error message to display if transcription fails
+</ParamField>
+
+<ParamField path="onApiKeyChange" type="(value: string) => void" required>
+  Callback fired when API key input changes
+</ParamField>
+
+<ParamField path="onFileSelected" type="(file: File | null) => void" required>
+  Callback fired when a file is selected or cleared
+</ParamField>
+
+<ParamField path="onOptionsChange" type="(options: TranscriptOptions) => void" required>
+  Callback fired when any transcription option changes
+</ParamField>
+
+<ParamField path="onSubmit" type="SubmitEventHandler<HTMLFormElement>" required>
+  Form submit handler for initiating transcription
+</ParamField>
+
+## TypeScript Interface
+
+```typescript
+type TranscriptionFormProps = {
+  apiKey: string;
+  file: File | null;
+  options: TranscriptOptions;
+  isTranscribing: boolean;
+  error: string | null;
+  onApiKeyChange: (value: string) => void;
+  onFileSelected: (file: File | null) => void;
+  onOptionsChange: (options: TranscriptOptions) => void;
+  onSubmit: SubmitEventHandler<HTMLFormElement>;
+};
+```
+
+## Usage Example
+
+```tsx
+import { useState } from "react";
+import { TranscriptionForm } from "@/features/speech-to-text-playground/transcription-form";
+import type { TranscriptOptions } from "@/features/speech-to-text-playground/speech-to-text-types";
+
+function MyComponent() {
+  const [apiKey, setApiKey] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [options, setOptions] = useState<TranscriptOptions>({
+    modelId: "scribe_v2",
+    tagAudioEvents: false,
+    timestampsGranularity: "character",
+    diarize: false,
+    useMultiChannel: false,
+  });
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    // Handle transcription logic
+  }
+
+  return (
+    <TranscriptionForm
+      apiKey={apiKey}
+      file={file}
+      options={options}
+      isTranscribing={isTranscribing}
+      error={error}
+      onApiKeyChange={setApiKey}
+      onFileSelected={setFile}
+      onOptionsChange={setOptions}
+      onSubmit={handleSubmit}
+    />
+  );
+}
+```
+
+## Configuration Options
+
+The form provides inputs for all ElevenLabs Speech-to-Text API parameters:
+
+### Model Selection
+
+Select between Scribe V1 and Scribe V2 models:
+
+```tsx
+<Select value={options.modelId} onValueChange={handleModelChange}>
+  <SelectContent>
+    <SelectItem value="scribe_v1">Scribe V1</SelectItem>
+    <SelectItem value="scribe_v2">Scribe V2</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+### Language Configuration
+
+Optional language code input (e.g., "en", "es", "fr"):
+
+```tsx
+<Input
+  id="language"
+  placeholder="e.g., en, es, fr"
+  value={options.languageCode || ""}
+  onChange={handleLanguageChange}
+/>
+```
+
+### Timestamps Granularity
+
+Control the level of timestamp detail:
+
+```tsx
+<Select
+  value={options.timestampsGranularity}
+  onValueChange={handleTimestampsChange}
+>
+  <SelectContent>
+    <SelectItem value="none">None</SelectItem>
+    <SelectItem value="word">Word</SelectItem>
+    <SelectItem value="character">Character</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+### Speaker Detection (Diarization)
+
+```tsx
+<Checkbox
+  id="diarize"
+  checked={options.diarize}
+  onCheckedChange={handleDiarizeChange}
+/>
+<Label htmlFor="diarize">Diarize (Speaker Detection)</Label>
+```
+
+### Number of Speakers
+
+Optional input (1-32) for specifying speaker count:
+
+```tsx
+<Input
+  id="speakers"
+  type="number"
+  min="1"
+  max="32"
+  placeholder="Auto-detect"
+  value={options.numSpeakers || ""}
+  onChange={handleNumSpeakersChange}
+/>
+```
+
+### Temperature Control
+
+Adjust model randomness (0.0-2.0):
+
+```tsx
+<Input
+  id="temperature"
+  type="number"
+  step="0.1"
+  min="0"
+  max="2"
+  value={options.temperature || ""}
+  onChange={handleTemperatureChange}
+/>
+```
+
+### Seed for Reproducibility
+
+```tsx
+<Input
+  id="seed"
+  type="number"
+  placeholder="Random"
+  value={options.seed || ""}
+  onChange={handleSeedChange}
+/>
+```
+
+### Keyterms
+
+Comma-separated list of important terms:
+
+```tsx
+<Textarea
+  id="keyterms"
+  placeholder="technical term, product name, ..."
+  value={options.keyterms?.join(", ") || ""}
+  onChange={handleKeytermsChange}
+/>
+```
+
+### Additional Options
+
+- **Tag Audio Events**: Detect non-speech audio like music, applause
+- **Multi-channel Audio**: Process multi-channel audio files
+- **Entity Detection**: Detect entities (e.g., "pii", "phi", "all")
+- **Diarization Threshold**: Fine-tune speaker detection (0.0-1.0)
+
+## File Handling
+
+The component uses a ref for the file input to enable programmatic clearing:
+
+```tsx
+const fileInputRef = useRef<HTMLInputElement>(null);
+
+function handleClearFileClick() {
+  onFileSelected(null);
+  if (fileInputRef.current) {
+    fileInputRef.current.value = "";
+  }
+}
+```
+
+File input accepts audio and video formats:
+
+```tsx
+<Input
+  id="file"
+  type="file"
+  ref={fileInputRef}
+  accept="audio/*,video/*"
+  onChange={handleFileChange}
+/>
+```
+
+## Error Display
+
+Errors are displayed in a prominent card:
+
+```tsx
+{error && (
+  <div className="p-4 bg-destructive/10 border border-destructive rounded-md">
+    <div className="flex items-start gap-3">
+      <div className="text-destructive mt-0.5">
+        {/* Error icon */}
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-destructive mb-1">Error</h3>
+        <p className="text-sm text-destructive/90">{error}</p>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+## Submit Button States
+
+The submit button reflects the current state:
+
+```tsx
+<Button
+  type="submit"
+  size="lg"
+  className="w-full"
+  disabled={!file || !apiKey || isTranscribing}
+>
+  {isTranscribing ? (
+    <>
+      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+      Transcribing...
+    </>
+  ) : (
+    <>
+      <UploadIcon className="mr-2 h-4 w-4" />
+      Transcribe Audio
+    </>
+  )}
+</Button>
+```
+
+## Dependencies
+
+```typescript
+import { useRef, type ChangeEvent, type FormEvent, type SubmitEventHandler } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { UploadIcon } from "lucide-react";
+import type { TranscriptOptions } from "./speech-to-text-types";
+import { isTranscriptModelId, isTranscriptTimestampsGranularity, parseKeytermsInput } from "./transcript-utils";
+```
+
+## Source Location
+
+`/home/daytona/workspace/source/src/features/speech-to-text-playground/transcription-form.tsx`

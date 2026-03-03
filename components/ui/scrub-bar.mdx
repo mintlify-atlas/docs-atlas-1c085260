@@ -1,0 +1,325 @@
+---
+title: 'Scrub Bar'
+description: 'Interactive audio scrubbing component with progress tracking and time labels'
+---
+
+## Overview
+
+The Scrub Bar is a composable audio control component that provides an interactive progress bar for seeking through audio/video content. It consists of multiple sub-components that work together through React Context to provide scrubbing functionality.
+
+## Components
+
+### ScrubBarContainer
+
+The root component that manages scrub bar state and provides context to child components.
+
+<ParamField path="duration" type="number" required>
+  Total duration of the audio/video in seconds
+</ParamField>
+
+<ParamField path="value" type="number" required>
+  Current playback position in seconds
+</ParamField>
+
+<ParamField path="onScrub" type="(time: number) => void">
+  Callback fired when user scrubs to a new position. Receives the new time in seconds.
+</ParamField>
+
+<ParamField path="onScrubStart" type="() => void">
+  Callback fired when user starts scrubbing (pointer down)
+</ParamField>
+
+<ParamField path="onScrubEnd" type="() => void">
+  Callback fired when user finishes scrubbing (pointer up)
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes. Default container uses `flex flex-col gap-2`
+</ParamField>
+
+### ScrubBarTrack
+
+The interactive track area where users can click and drag to scrub.
+
+<ParamField path="className" type="string">
+  Additional CSS classes. Default track uses `relative w-full cursor-pointer`
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  Child components (typically ScrubBarProgress and ScrubBarThumb)
+</ParamField>
+
+**Features:**
+- Handles pointer events for click-and-drag scrubbing
+- Calculates time position from mouse/touch coordinates
+- Manages global pointer events during drag
+- Stores current value in `data-scrub-value` attribute
+
+### ScrubBarProgress
+
+Visual progress indicator that fills based on current playback position.
+
+<ParamField path="className" type="string">
+  Additional CSS classes. Default height is `h-2`
+</ParamField>
+
+**Note:** Inherits all props from the Progress component (from Radix UI) except `value`, which is automatically calculated from context.
+
+### ScrubBarThumb
+
+Draggable thumb indicator that shows the current position.
+
+<ParamField path="className" type="string">
+  Additional CSS classes. Default styles: `absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary`
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  Optional content inside the thumb
+</ParamField>
+
+**Features:**
+- Positioned absolutely using `left: ${progress}%`
+- Pointer events disabled (`pointer-events-none`)
+- Automatically centered on track
+
+### ScrubBarTimeLabel
+
+Formatted time display component.
+
+<ParamField path="time" type="number" required>
+  Time value in seconds to display
+</ParamField>
+
+<ParamField path="format" type="(time: number) => string">
+  Custom formatter function. Defaults to `formatTimestamp` which displays as `M:SS`
+</ParamField>
+
+<ParamField path="className" type="string">
+  Additional CSS classes. Default styles: `text-xs text-muted-foreground`
+</ParamField>
+
+**Default Format:**
+- Formats time as `M:SS` (e.g., `0:00`, `3:42`, `12:05`)
+- Handles invalid/negative values by returning `"0:00"`
+
+## Usage Example
+
+### Basic Usage
+
+```tsx
+import {
+  ScrubBarContainer,
+  ScrubBarTrack,
+  ScrubBarProgress,
+  ScrubBarThumb,
+  ScrubBarTimeLabel,
+} from '@/components/ui/scrub-bar';
+
+function AudioPlayer() {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(120); // 2 minutes
+
+  return (
+    <ScrubBarContainer
+      duration={duration}
+      value={currentTime}
+      onScrub={(time) => setCurrentTime(time)}
+    >
+      <ScrubBarTrack>
+        <ScrubBarProgress />
+        <ScrubBarThumb />
+      </ScrubBarTrack>
+      <div className="flex justify-between">
+        <ScrubBarTimeLabel time={currentTime} />
+        <ScrubBarTimeLabel time={duration} />
+      </div>
+    </ScrubBarContainer>
+  );
+}
+```
+
+### With Audio Control
+
+```tsx
+import { useRef, useState } from 'react';
+import {
+  ScrubBarContainer,
+  ScrubBarTrack,
+  ScrubBarProgress,
+  ScrubBarThumb,
+  ScrubBarTimeLabel,
+} from '@/components/ui/scrub-bar';
+
+function AudioPlayerWithControls() {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handleScrub = (time: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const handleScrubStart = () => {
+    if (audioRef.current && isPlaying) {
+      audioRef.current.pause();
+    }
+  };
+
+  const handleScrubEnd = () => {
+    if (audioRef.current && isPlaying) {
+      audioRef.current.play();
+    }
+  };
+
+  return (
+    <div>
+      <audio
+        ref={audioRef}
+        src="/audio.mp3"
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+      />
+      
+      <ScrubBarContainer
+        duration={duration}
+        value={currentTime}
+        onScrub={handleScrub}
+        onScrubStart={handleScrubStart}
+        onScrubEnd={handleScrubEnd}
+      >
+        <ScrubBarTrack>
+          <ScrubBarProgress className="h-3" />
+          <ScrubBarThumb className="size-4" />
+        </ScrubBarTrack>
+        <div className="flex justify-between">
+          <ScrubBarTimeLabel time={currentTime} />
+          <ScrubBarTimeLabel time={duration} />
+        </div>
+      </ScrubBarContainer>
+    </div>
+  );
+}
+```
+
+### Custom Time Format
+
+```tsx
+import { ScrubBarTimeLabel } from '@/components/ui/scrub-bar';
+
+function formatHMS(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+<ScrubBarTimeLabel time={currentTime} format={formatHMS} />
+```
+
+## Real-World Example
+
+From the TranscriptViewer component (`src/components/ui/transcript-viewer.tsx:328`):
+
+```tsx
+function TranscriptViewerScrubBar({
+  className,
+  showTimeLabels = true,
+  labelsClassName,
+  trackClassName,
+  progressClassName,
+  thumbClassName,
+  ...props
+}: TranscriptViewerScrubBarProps) {
+  const { duration, currentTime, seekToTime, startScrubbing, endScrubbing } =
+    useTranscriptViewerContext();
+    
+  return (
+    <ScrubBarContainer
+      duration={duration}
+      value={currentTime}
+      onScrub={seekToTime}
+      onScrubStart={startScrubbing}
+      onScrubEnd={endScrubbing}
+      className={className}
+      {...props}
+    >
+      <ScrubBarTrack className={trackClassName}>
+        <ScrubBarProgress className={progressClassName} />
+        <ScrubBarThumb className={thumbClassName} />
+      </ScrubBarTrack>
+      {showTimeLabels && (
+        <div className={cn("flex justify-between", labelsClassName)}>
+          <ScrubBarTimeLabel time={currentTime} />
+          <ScrubBarTimeLabel time={duration} />
+        </div>
+      )}
+    </ScrubBarContainer>
+  );
+}
+```
+
+## Implementation Details
+
+### Context API
+
+The scrub bar uses React Context to share state between components:
+
+```typescript
+interface ScrubBarContextValue {
+  duration: number;
+  value: number;
+  progress: number; // Calculated as (value / duration) * 100
+  onScrub?: (time: number) => void;
+  onScrubStart?: () => void;
+  onScrubEnd?: () => void;
+}
+```
+
+### Pointer Event Handling
+
+The `ScrubBarTrack` component implements advanced pointer event handling:
+
+1. **Pointer Down**: Captures initial click position and starts scrubbing
+2. **Pointer Move**: Tracks drag movement globally (window-level)
+3. **Pointer Up**: Ends scrubbing and cleans up event listeners
+
+### Time Calculation
+
+Time is calculated from pointer position using:
+
+```typescript
+const rect = track.getBoundingClientRect();
+const ratio = (clientX - rect.left) / rect.width;
+const clamped = Math.min(Math.max(ratio, 0), 1);
+const time = duration * clamped;
+```
+
+## Styling
+
+All components support Tailwind CSS classes and use the `cn()` utility for class merging:
+
+- **Container**: Default `flex flex-col gap-2`
+- **Track**: Default `relative w-full cursor-pointer`
+- **Progress**: Default `h-2` (via Progress component)
+- **Thumb**: Default `absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary`
+- **Time Label**: Default `text-xs text-muted-foreground`
+
+## Accessibility
+
+- Uses semantic HTML elements
+- Pointer events support touch and mouse input
+- Visual feedback through cursor changes
+- Time values stored in `data-scrub-value` attribute for testing/debugging
+
+## Related Components
+
+- [Form Controls](/components/ui/form-controls) - Other UI components in the design system
+- [TranscriptViewer](/components/transcript-viewer) - Higher-level component using ScrubBar

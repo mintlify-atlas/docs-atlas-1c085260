@@ -1,0 +1,400 @@
+---
+title: Transcript Viewer
+description: Real-time transcript display with word-level synchronization and highlighting
+---
+
+## Overview
+
+The Transcript Viewer provides an interactive display of transcribed text with real-time word highlighting synchronized to audio playback. It uses character-level alignment data from the ElevenLabs API to achieve precise synchronization.
+
+## Core Components
+
+The viewer is built with composable React components:
+
+```tsx
+import {
+  TranscriptViewerContainer,
+  TranscriptViewerWords,
+  TranscriptViewerAudio,
+  TranscriptViewerPlayPauseButton,
+  TranscriptViewerScrubBar,
+} from "@/components/ui/transcript-viewer";
+```
+
+### Basic Usage
+
+```tsx
+<TranscriptViewerContainer
+  audioSrc={audioUrl}
+  audioType="audio/mpeg"
+  alignment={alignment}
+>
+  <TranscriptViewerPlayPauseButton />
+  <TranscriptViewerScrubBar />
+  <TranscriptViewerWords />
+  <TranscriptViewerAudio />
+</TranscriptViewerContainer>
+```
+
+## Character Alignment Data
+
+The viewer requires character-level alignment data from the transcription:
+
+```typescript
+type CharacterAlignmentResponseModel = {
+  characters: string[];
+  characterStartTimesSeconds: number[];
+  characterEndTimesSeconds: number[];
+};
+```
+
+This data is generated from the API response:
+
+```typescript
+export function convertToAlignment(
+  transcript: SpeechToTextChunkResponseModel
+): CharacterAlignmentResponseModel {
+  const characters: string[] = [];
+  const characterStartTimesSeconds: number[] = [];
+  const characterEndTimesSeconds: number[] = [];
+
+  for (const word of transcript.words) {
+    if (word.characters && word.characters.length > 0) {
+      // Use character-level data from API
+      for (const char of word.characters) {
+        characters.push(char.text);
+        characterStartTimesSeconds.push(char.start || 0);
+        characterEndTimesSeconds.push(char.end || 0);
+      }
+    } else {
+      // Fallback: interpolate from word timing
+      appendWordCharactersFromText(
+        word,
+        characters,
+        characterStartTimesSeconds,
+        characterEndTimesSeconds
+      );
+    }
+  }
+
+  return {
+    characters,
+    characterStartTimesSeconds,
+    characterEndTimesSeconds,
+  };
+}
+```
+
+<Note>
+  Request character-level timestamps by setting `timestampsGranularity: "character"` in your transcription options for the most accurate synchronization.
+</Note>
+
+## Word Tracking
+
+The viewer maintains real-time tracking of the current word during playback:
+
+### Segment Types
+
+```typescript
+type TranscriptWord = {
+  kind: "word";
+  segmentIndex: number;
+  wordIndex: number;
+  text: string;
+  startTime: number;
+  endTime: number;
+};
+
+type GapSegment = {
+  kind: "gap";
+  segmentIndex: number;
+  text: string;
+};
+
+type TranscriptSegment = TranscriptWord | GapSegment;
+```
+
+### Current Word Detection
+
+The `useTranscriptViewer` hook tracks the current word based on playback time:
+
+```typescript
+const handleTimeUpdate = useCallback(
+  function handleTimeUpdate(currentTime: number) {
+    if (!words.length) return;
+
+    const currentWord =
+      currentWordIndex >= 0 && currentWordIndex < words.length
+        ? words[currentWordIndex]
+        : undefined;
+
+    if (!currentWord) {
+      const found = findWordIndex(words, currentTime);
+      if (found !== -1) setCurrentWordIndex(found);
+      return;
+    }
+
+    // Move forward if we've passed the current word
+    if (
+      currentTime >= currentWord.endTime &&
+      currentWordIndex + 1 < words.length
+    ) {
+      const next = getNextWordIndexByStartTime(words, currentTime, currentWordIndex);
+      setCurrentWordIndex(next);
+      return;
+    }
+
+    // Move backward if we've seeked backwards
+    if (currentTime < currentWord.startTime) {
+      const found = findWordIndex(words, currentTime);
+      if (found !== -1) setCurrentWordIndex(found);
+      return;
+    }
+
+    // Re-find if we're out of sync
+    const found = findWordIndex(words, currentTime);
+    if (found !== -1 && found !== currentWordIndex) {
+      setCurrentWordIndex(found);
+    }
+  },
+  [currentWordIndex, words]
+);
+```
+
+## Word Status & Highlighting
+
+Words are rendered with three different states:
+
+```typescript
+type TranscriptViewerWordStatus = "spoken" | "unspoken" | "current";
+```
+
+### Default Styling
+
+```tsx
+function TranscriptViewerWord({ word, status, className, children }: TranscriptViewerWordProps) {
+  return (
+    <span
+      className={cn(
+        "transition-colors",
+        status === "spoken" && "text-muted-foreground",
+        status === "current" && "text-primary font-semibold",
+        status === "unspoken" && "text-foreground",
+        className
+      )}
+    >
+      {children ?? word.text}
+    </span>
+  );
+}
+```
+
+- **Spoken** words appear muted (already read)
+- **Current** word is highlighted with primary color and bold
+- **Unspoken** words use default text color
+
+### Custom Word Rendering
+
+You can customize how words are displayed:
+
+```tsx
+<TranscriptViewerWords
+  renderWord={({ word, status }) => (
+    <span className={status === "current" ? "bg-yellow-200" : ""}>
+      {word.text}
+    </span>
+  )}
+/>
+```
+
+## Segment Composition
+
+The viewer composes segments from alignment data, handling gaps and audio tags:
+
+```typescript
+const { segments, words } = useMemo(() => {
+  if (segmentComposer) {
+    return segmentComposer(alignment);
+  }
+  return composeSegments(alignment, { hideAudioTags });
+}, [segmentComposer, alignment, hideAudioTags]);
+```
+
+### Hiding Audio Tags
+
+By default, audio event tags (like `[LAUGHTER]`) are hidden:
+
+```tsx
+<TranscriptViewerContainer
+  alignment={alignment}
+  hideAudioTags={true}  // Default
+  audioSrc={audioUrl}
+  audioType="audio/mpeg"
+>
+```
+
+### Custom Segment Composer
+
+Provide a custom function to control segment composition:
+
+```typescript
+type SegmentComposer = (
+  alignment: CharacterAlignmentResponseModel
+) => {
+  segments: TranscriptSegment[];
+  words: TranscriptWord[];
+};
+```
+
+## Segment State Management
+
+The viewer tracks spoken and unspoken segments:
+
+```typescript
+const spokenSegments = useMemo(
+  function computeSpokenSegments() {
+    if (!segments.length || currentSegmentIndex <= 0) return [];
+    return segments.slice(0, currentSegmentIndex);
+  },
+  [segments, currentSegmentIndex]
+);
+
+const unspokenSegments = useMemo(
+  function computeUnspokenSegments() {
+    if (!segments.length) return [];
+    if (currentSegmentIndex === -1) return segments;
+    if (currentSegmentIndex + 1 >= segments.length) return [];
+    return segments.slice(currentSegmentIndex + 1);
+  },
+  [segments, currentSegmentIndex]
+);
+```
+
+## Rendering Segments
+
+The words component renders all segments with their status:
+
+```tsx
+function TranscriptViewerWords({ renderWord, renderGap, wordClassNames, gapClassNames }: TranscriptViewerWordsProps) {
+  const { spokenSegments, unspokenSegments, currentWord, segments, duration, currentTime } =
+    useTranscriptViewerContext();
+
+  const nearEnd = useMemo(() => {
+    if (!duration) return false;
+    return currentTime >= duration - 0.01;
+  }, [currentTime, duration]);
+
+  const segmentsWithStatus = useMemo(() => {
+    if (nearEnd) {
+      return segments.map((segment) => ({
+        segment,
+        status: "spoken" as const,
+      }));
+    }
+
+    const entries: Array<{
+      segment: TranscriptSegment;
+      status: TranscriptViewerWordStatus;
+    }> = [];
+
+    for (const segment of spokenSegments) {
+      entries.push({ segment, status: "spoken" });
+    }
+
+    if (currentWord) {
+      entries.push({ segment: currentWord, status: "current" });
+    }
+
+    for (const segment of unspokenSegments) {
+      entries.push({ segment, status: "unspoken" });
+    }
+
+    return entries;
+  }, [spokenSegments, unspokenSegments, currentWord, nearEnd, segments]);
+
+  return (
+    <div className="text-base leading-relaxed">
+      {segmentsWithStatus.map(({ segment, status }) => {
+        if (segment.kind === "gap") {
+          const content = renderGap ? renderGap({ segment, status }) : segment.text;
+          return (
+            <span key={segment.segmentIndex} className={gapClassNames}>
+              {content}
+            </span>
+          );
+        }
+
+        if (renderWord) {
+          return (
+            <span key={segment.segmentIndex} className={wordClassNames}>
+              {renderWord({ word: segment, status })}
+            </span>
+          );
+        }
+
+        return (
+          <TranscriptViewerWord
+            key={segment.segmentIndex}
+            word={segment}
+            status={status}
+            className={wordClassNames}
+          />
+        );
+      })}
+    </div>
+  );
+}
+```
+
+## Performance Optimization
+
+The viewer uses `requestAnimationFrame` for smooth updates:
+
+```typescript
+const startRaf = useCallback(
+  function startRaf() {
+    if (rafRef.current != null) return;
+    function tick() {
+      const node = audioRef.current;
+      if (!node) {
+        rafRef.current = null;
+        return;
+      }
+      const time = node.currentTime;
+      setCurrentTime(time);
+      handleTimeUpdateRef.current(time);
+      syncDurationFromMetadataIfMissing(node);
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  },
+  [audioRef, syncDurationFromMetadataIfMissing]
+);
+```
+
+<Warning>
+  The RAF loop is only active during playback. It's automatically stopped when audio is paused to conserve resources.
+</Warning>
+
+## Event Callbacks
+
+The container accepts playback event callbacks:
+
+```tsx
+<TranscriptViewerContainer
+  alignment={alignment}
+  audioSrc={audioUrl}
+  audioType="audio/mpeg"
+  onPlay={() => console.log("Started playing")}
+  onPause={() => console.log("Paused")}
+  onTimeUpdate={(time) => console.log("Time:", time)}
+  onEnded={() => console.log("Finished")}
+  onDurationChange={(duration) => console.log("Duration:", duration)}
+>
+```
+
+## Next Steps
+
+- Implement [Audio Playback](/features/audio-playback) controls for scrubbing and seeking
+- Add [Speaker Diarization](/features/speaker-diarization) to highlight different speakers
+- Configure [Transcription](/features/transcription) options for optimal results

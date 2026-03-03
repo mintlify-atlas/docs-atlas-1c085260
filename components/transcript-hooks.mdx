@@ -1,0 +1,432 @@
+---
+title: "useTranscriptViewer Hook"
+description: "React hook for building custom transcript viewer components with audio synchronization"
+---
+
+The `useTranscriptViewer` hook provides low-level access to transcript viewer state and controls. Use this hook when building custom transcript viewer UIs.
+
+## Import
+
+```tsx
+import { useTranscriptViewer } from "@/features/transcript-view/use-transcript-viewer";
+```
+
+## Basic Usage
+
+```tsx
+function CustomTranscriptViewer({ alignment, audioSrc }) {
+  const viewer = useTranscriptViewer({ alignment });
+
+  return (
+    <div>
+      <audio ref={viewer.audioRef} src={audioSrc} />
+      <button onClick={viewer.isPlaying ? viewer.pause : viewer.play}>
+        {viewer.isPlaying ? "Pause" : "Play"}
+      </button>
+      <div>
+        {viewer.currentTime.toFixed(2)} / {viewer.duration.toFixed(2)}
+      </div>
+    </div>
+  );
+}
+```
+
+## Parameters
+
+<ParamField path="alignment" type="CharacterAlignmentResponseModel" required>
+  Character-level alignment data from ElevenLabs Speech-to-Text API. Contains:
+  - `characters` - Array of individual characters
+  - `characterStartTimesSeconds` - Start time for each character (in seconds)
+  - `characterEndTimesSeconds` - End time for each character (in seconds)
+</ParamField>
+
+<ParamField path="hideAudioTags" type="boolean" default="true">
+  Whether to hide audio tags (e.g., `[music]`, `[applause]`) from the transcript. When `true`, any text between `[` and `]` is filtered out during segment composition.
+</ParamField>
+
+<ParamField path="segmentComposer" type="SegmentComposer">
+  Custom function to compose transcript segments from alignment data. If not provided, uses the default `composeSegments` function.
+  
+  ```tsx
+  type SegmentComposer = (
+    alignment: CharacterAlignmentResponseModel
+  ) => ComposeSegmentsResult;
+
+  type ComposeSegmentsResult = {
+    segments: TranscriptSegment[];
+    words: TranscriptWord[];
+  };
+  ```
+</ParamField>
+
+<ParamField path="onPlay" type="() => void">
+  Callback invoked when audio playback starts
+</ParamField>
+
+<ParamField path="onPause" type="() => void">
+  Callback invoked when audio playback pauses
+</ParamField>
+
+<ParamField path="onTimeUpdate" type="(time: number) => void">
+  Callback invoked when audio time updates. Receives the current time in seconds.
+</ParamField>
+
+<ParamField path="onEnded" type="() => void">
+  Callback invoked when audio playback completes
+</ParamField>
+
+<ParamField path="onDurationChange" type="(duration: number) => void">
+  Callback invoked when audio duration is loaded or changes. Receives the duration in seconds.
+</ParamField>
+
+## Return Value
+
+The hook returns an object with the following properties:
+
+### State
+
+<ResponseField name="segments" type="TranscriptSegment[]">
+  All transcript segments including both words and gaps (whitespace/punctuation)
+</ResponseField>
+
+<ResponseField name="words" type="TranscriptWord[]">
+  Only the word segments, excluding gaps. Each word contains:
+  ```tsx
+  {
+    kind: "word";
+    segmentIndex: number;
+    wordIndex: number;
+    text: string;
+    startTime: number;
+    endTime: number;
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="spokenSegments" type="TranscriptSegment[]">
+  Segments that have already been spoken (before current word)
+</ResponseField>
+
+<ResponseField name="unspokenSegments" type="TranscriptSegment[]">
+  Segments that haven't been spoken yet (after current word)
+</ResponseField>
+
+<ResponseField name="currentWord" type="TranscriptWord | null">
+  The word currently being spoken, or `null` if no word is active
+</ResponseField>
+
+<ResponseField name="currentSegmentIndex" type="number">
+  Index of the current segment in the `segments` array. Returns `-1` if no current word.
+</ResponseField>
+
+<ResponseField name="currentWordIndex" type="number">
+  Index of the current word in the `words` array. Returns `-1` if no current word.
+</ResponseField>
+
+<ResponseField name="isPlaying" type="boolean">
+  Whether audio is currently playing
+</ResponseField>
+
+<ResponseField name="isScrubbing" type="boolean">
+  Whether user is actively scrubbing/seeking through the timeline
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Total audio duration in seconds. Falls back to alignment data if audio duration isn't available.
+</ResponseField>
+
+<ResponseField name="currentTime" type="number">
+  Current playback position in seconds
+</ResponseField>
+
+<ResponseField name="audioRef" type="RefObject<HTMLAudioElement | null>">
+  React ref to attach to your audio element
+</ResponseField>
+
+### Actions
+
+<ResponseField name="play" type="() => void">
+  Start audio playback. Safe to call even if already playing.
+</ResponseField>
+
+<ResponseField name="pause" type="() => void">
+  Pause audio playback. Safe to call even if already paused.
+</ResponseField>
+
+<ResponseField name="seekToTime" type="(time: number) => void">
+  Seek to a specific time in seconds. Updates both the audio element and internal state.
+  
+  ```tsx
+  viewer.seekToTime(30.5); // Seek to 30.5 seconds
+  ```
+</ResponseField>
+
+<ResponseField name="seekToWord" type="(word: number | TranscriptWord) => void">
+  Seek to the start of a specific word. Accepts either a word index or a `TranscriptWord` object.
+  
+  ```tsx
+  viewer.seekToWord(5); // Seek to the 6th word (0-indexed)
+  viewer.seekToWord(viewer.words[10]); // Seek to a specific word object
+  ```
+</ResponseField>
+
+<ResponseField name="startScrubbing" type="() => void">
+  Called when user starts scrubbing. Pauses animation frame updates for smoother scrubbing.
+</ResponseField>
+
+<ResponseField name="endScrubbing" type="() => void">
+  Called when user stops scrubbing. Resumes animation frame updates if audio is playing.
+</ResponseField>
+
+## Implementation Details
+
+### Animation Frame Updates
+
+The hook uses `requestAnimationFrame` for smooth time updates during playback:
+
+```tsx
+// Simplified internal implementation
+function startRaf() {
+  function tick() {
+    const time = audioRef.current.currentTime;
+    setCurrentTime(time);
+    handleTimeUpdateRef.current(time);
+    rafRef.current = requestAnimationFrame(tick);
+  }
+  rafRef.current = requestAnimationFrame(tick);
+}
+```
+
+This ensures:
+- Smooth UI updates (60fps when possible)
+- Efficient word highlighting without lag
+- Automatic cleanup when component unmounts
+
+### Word Index Tracking
+
+The hook tracks the current word using binary search for efficiency:
+
+```tsx
+// From word-index.ts
+function findWordIndex(words: TranscriptWord[], time: number): number {
+  let lo = 0;
+  let hi = words.length - 1;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const word = words[mid];
+    if (time >= word.startTime && time < word.endTime) {
+      return mid;
+    }
+    if (time < word.startTime) {
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return -1;
+}
+```
+
+Optimizations:
+- Binary search for O(log n) lookups
+- Sequential forward search when moving to next word
+- Caches current word index to avoid redundant searches
+
+### Duration Fallback
+
+If audio duration isn't available, the hook calculates it from alignment data:
+
+```tsx
+function getAlignmentFallbackDuration(
+  alignment: CharacterAlignmentResponseModel,
+  words: TranscriptWord[]
+): number {
+  const ends = alignment?.characterEndTimesSeconds;
+  if (Array.isArray(ends) && ends.length) {
+    return ends[ends.length - 1];
+  }
+  if (words.length) {
+    return words[words.length - 1].endTime;
+  }
+  return 0;
+}
+```
+
+### Event Listener Management
+
+The hook automatically manages audio event listeners:
+
+```tsx
+useEffect(() => {
+  const audio = audioRef.current;
+  if (!audio) return;
+
+  function handlePlay() {
+    setIsPlaying(true);
+    startRaf();
+    onPlay?.();
+  }
+
+  function handlePause() {
+    setIsPlaying(false);
+    stopRaf();
+    onPause?.();
+  }
+
+  // ... more event handlers
+
+  audio.addEventListener("play", handlePlay);
+  audio.addEventListener("pause", handlePause);
+  // ... more listeners
+
+  return () => {
+    // Cleanup
+    stopRaf();
+    audio.removeEventListener("play", handlePlay);
+    audio.removeEventListener("pause", handlePause);
+    // ... more cleanup
+  };
+}, [audioRef, onPlay, onPause, ...]);
+```
+
+## Advanced Example
+
+```tsx
+import { useTranscriptViewer } from "@/features/transcript-view/use-transcript-viewer";
+
+function AdvancedTranscriptViewer({ alignment, audioSrc }) {
+  const viewer = useTranscriptViewer({
+    alignment,
+    hideAudioTags: true,
+    onPlay: () => console.log("Playback started"),
+    onPause: () => console.log("Playback paused"),
+    onTimeUpdate: (time) => {
+      // Send analytics every 5 seconds
+      if (Math.floor(time) % 5 === 0) {
+        analytics.track("transcript_progress", { time });
+      }
+    },
+  });
+
+  return (
+    <div>
+      {/* Audio element */}
+      <audio
+        ref={viewer.audioRef}
+        src={audioSrc}
+        preload="metadata"
+      />
+
+      {/* Custom controls */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={viewer.play} disabled={viewer.isPlaying}>
+          Play
+        </button>
+        <button onClick={viewer.pause} disabled={!viewer.isPlaying}>
+          Pause
+        </button>
+        <button onClick={() => viewer.seekToTime(0)}>
+          Restart
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-4">
+        <input
+          type="range"
+          min={0}
+          max={viewer.duration}
+          value={viewer.currentTime}
+          onChange={(e) => viewer.seekToTime(Number(e.target.value))}
+          onMouseDown={viewer.startScrubbing}
+          onMouseUp={viewer.endScrubbing}
+          className="w-full"
+        />
+        <div className="flex justify-between text-sm">
+          <span>{viewer.currentTime.toFixed(2)}s</span>
+          <span>{viewer.duration.toFixed(2)}s</span>
+        </div>
+      </div>
+
+      {/* Transcript with custom rendering */}
+      <div className="space-y-2">
+        {viewer.segments.map((segment) => {
+          if (segment.kind === "gap") {
+            return <span key={segment.segmentIndex}>{segment.text}</span>;
+          }
+
+          const isSpoken = viewer.spokenSegments.includes(segment);
+          const isCurrent = viewer.currentWord === segment;
+          const isUnspoken = viewer.unspokenSegments.includes(segment);
+
+          return (
+            <span
+              key={segment.segmentIndex}
+              onClick={() => viewer.seekToWord(segment)}
+              className={`
+                cursor-pointer
+                ${isSpoken ? "text-gray-400" : ""}
+                ${isCurrent ? "text-blue-600 font-bold" : ""}
+                ${isUnspoken ? "text-black" : ""}
+              `}
+            >
+              {segment.text}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Debug info */}
+      <div className="mt-4 p-4 bg-gray-100 rounded">
+        <div>Current Word Index: {viewer.currentWordIndex}</div>
+        <div>Current Segment Index: {viewer.currentSegmentIndex}</div>
+        <div>Is Playing: {viewer.isPlaying ? "Yes" : "No"}</div>
+        <div>Is Scrubbing: {viewer.isScrubbing ? "Yes" : "No"}</div>
+        <div>Total Words: {viewer.words.length}</div>
+        <div>Total Segments: {viewer.segments.length}</div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Type Definitions
+
+```tsx
+type UseTranscriptViewerProps = {
+  alignment: CharacterAlignmentResponseModel;
+  segmentComposer?: SegmentComposer;
+  hideAudioTags?: boolean;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onTimeUpdate?: (time: number) => void;
+  onEnded?: () => void;
+  onDurationChange?: (duration: number) => void;
+};
+
+type UseTranscriptViewerResult = {
+  segments: TranscriptSegment[];
+  words: TranscriptWord[];
+  spokenSegments: TranscriptSegment[];
+  unspokenSegments: TranscriptSegment[];
+  currentWord: TranscriptWord | null;
+  currentSegmentIndex: number;
+  currentWordIndex: number;
+  seekToTime: (time: number) => void;
+  seekToWord: (word: number | TranscriptWord) => void;
+  audioRef: RefObject<HTMLAudioElement | null>;
+  isPlaying: boolean;
+  isScrubbing: boolean;
+  duration: number;
+  currentTime: number;
+  play: () => void;
+  pause: () => void;
+  startScrubbing: () => void;
+  endScrubbing: () => void;
+};
+```
+
+## See Also
+
+- [Transcript Viewer Components](/components/transcript-viewer) - High-level UI components
+- [Word Alignment](/components/word-alignment) - Understanding the alignment system

@@ -1,0 +1,190 @@
+---
+title: Build Process
+description: Build the ElevenLabs Speech-to-Text API UI for production deployment
+---
+
+## Overview
+
+The project uses Bun's native build system with a custom build script (`build.ts`) that processes HTML entrypoints and bundles all assets for production.
+
+## Build Configuration
+
+The build process is configured in `build.ts:125-136` with the following defaults:
+
+```typescript
+const result = await Bun.build({
+  entrypoints,
+  outdir,
+  plugins: [plugin],
+  minify: true,
+  target: "browser",
+  sourcemap: "linked",
+  define: {
+    "process.env.NODE_ENV": JSON.stringify("production"),
+  },
+});
+```
+
+### Default Settings
+
+- **Output Directory**: `dist/`
+- **Minification**: Enabled
+- **Target**: Browser
+- **Sourcemaps**: Linked (external .map files)
+- **Plugins**: Tailwind CSS plugin (bun-plugin-tailwind)
+- **Entrypoints**: All `.html` files in `src/` directory
+
+## Building for Production
+
+<Steps>
+  <Step title="Run the build command">
+    ```bash
+    bun run build
+    ```
+    
+    This executes the `build.ts` script which:
+    1. Cleans the previous `dist/` directory
+    2. Scans for all HTML entrypoints in `src/`
+    3. Bundles JavaScript, CSS, and processes Tailwind
+    4. Outputs minified files to `dist/`
+  </Step>
+
+  <Step title="Verify build output">
+    The build script displays a table showing all generated files:
+    
+    ```
+    📄 Found 1 HTML file to process
+    
+    ┌─────────┬──────────────────┬──────────┬──────────┐
+    │ (index) │ File             │ Type     │ Size     │
+    ├─────────┼──────────────────┼──────────┼──────────┤
+    │ 0       │ dist/index.html  │ entry    │ 45.23 KB │
+    │ 1       │ dist/index.js    │ chunk    │ 234.12 KB│
+    │ 2       │ dist/index.css   │ asset    │ 12.45 KB │
+    └─────────┴──────────────────┴──────────┴──────────┘
+    
+    ✅ Build completed in 142.34ms
+    ```
+  </Step>
+
+  <Step title="Deploy the dist folder">
+    The entire `dist/` directory contains your production-ready application. Deploy this folder to your hosting platform.
+  </Step>
+</Steps>
+
+## Build Options
+
+The build script accepts command-line arguments to customize the build process. View all available options:
+
+```bash
+bun run build.ts --help
+```
+
+### Common Build Options
+
+<CodeGroup>
+```bash Custom Output Directory
+bun run build.ts --outdir=public
+```
+
+```bash Disable Minification
+bun run build.ts --no-minify
+```
+
+```bash External Dependencies
+bun run build.ts --external=react,react-dom
+```
+
+```bash Inline Sourcemaps
+bun run build.ts --sourcemap=inline
+```
+
+```bash Multiple Options
+bun run build.ts --outdir=build --minify --sourcemap=linked
+```
+</CodeGroup>
+
+### Available Options
+
+| Option | Description | Default |
+|--------|-------------|----------|
+| `--outdir <path>` | Output directory | `dist` |
+| `--minify` | Enable minification | `true` |
+| `--sourcemap <type>` | Sourcemap type (none\|linked\|inline\|external) | `linked` |
+| `--target <target>` | Build target (browser\|bun\|node) | `browser` |
+| `--format <format>` | Output format (esm\|cjs\|iife) | - |
+| `--splitting` | Enable code splitting | - |
+| `--external <list>` | External packages (comma separated) | - |
+| `--public-path <path>` | Public path for assets | - |
+
+## Production Server
+
+After building, you can run the production server:
+
+```bash
+bun run start
+```
+
+This executes: `NODE_ENV=production bun src/index.ts`
+
+The production server:
+- Serves static files from the `dist/` directory
+- Runs in production mode for optimized performance
+- Uses Bun's built-in HTTP server
+
+## Development vs Production
+
+<CodeGroup>
+```bash Development
+bun run dev
+# Starts dev server with hot reload
+# Command: bun --hot src/index.ts
+```
+
+```bash Production Build
+bun run build
+# Builds optimized production assets
+# Output: dist/ directory
+```
+
+```bash Production Server
+bun run start
+# Serves production build
+# Command: NODE_ENV=production bun src/index.ts
+```
+</CodeGroup>
+
+## Build Output Structure
+
+After running `bun run build`, your `dist/` directory will contain:
+
+```
+dist/
+├── index.html       # Main HTML file
+├── index.js         # Bundled JavaScript (minified)
+├── index.js.map     # Source map
+└── index.css        # Bundled CSS with Tailwind (minified)
+```
+
+## Troubleshooting
+
+### Build Fails
+
+If the build fails, ensure:
+- All dependencies are installed: `bun install`
+- You're using Bun version 1.x or higher: `bun --version`
+- The `src/` directory contains valid HTML entrypoints
+
+### Large Bundle Size
+
+To reduce bundle size:
+```bash
+bun run build.ts --minify --external=react,react-dom
+```
+
+### Missing Sourcemaps
+
+To disable sourcemaps for smaller builds:
+```bash
+bun run build.ts --sourcemap=none
+```

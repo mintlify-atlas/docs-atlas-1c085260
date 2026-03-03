@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: A modern web UI for ElevenLabs Speech-to-Text API powered by Bun and React
+---
+
+# ElevenLabs Speech-to-Text API UI
+
+A fast, modern web interface for transcribing audio and video files using the ElevenLabs Scribe API. Built with Bun, React, and Tailwind CSS, this application provides a complete playground for testing and exploring ElevenLabs' powerful speech-to-text capabilities.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in minutes with your first transcription
+  </Card>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/installation"
+  >
+    Detailed setup instructions for Bun and project dependencies
+  </Card>
+</CardGroup>
+
+## Key features
+
+This application provides a comprehensive interface for the ElevenLabs Speech-to-Text API with the following capabilities:
+
+### Advanced transcription options
+
+- **Multiple models** - Choose between Scribe V1 and Scribe V2
+- **Speaker diarization** - Automatically detect and label different speakers in your audio
+- **Timestamp granularity** - Get word-level or character-level timestamps for precise alignment
+- **Multi-channel support** - Process audio files with multiple channels
+- **Audio event tagging** - Detect and tag non-speech audio events
+
+### Customization and control
+
+- **Language detection** - Specify language codes for better accuracy
+- **Custom keyterms** - Provide domain-specific terms for improved recognition
+- **Entity detection** - Identify PII, PHI, or other entities in transcripts
+- **Temperature control** - Fine-tune the randomness of transcription output
+- **Deterministic output** - Use seed values for reproducible results
+
+### Interactive transcript viewer
+
+- **Synchronized playback** - Click words to jump to specific timestamps in the audio
+- **Speaker labeling** - Rename speakers for better readability
+- **Visual timeline** - See the full transcript with speaker segments
+- **Audio scrubbing** - Navigate through your audio with a visual scrub bar
+
+## Technology stack
+
+This project is built with modern web technologies optimized for performance:
+
+- **[Bun](https://bun.sh)** - All-in-one JavaScript runtime with built-in dev server and hot reload
+- **[React 19](https://react.dev)** - Latest version of React for building the UI
+- **[Tailwind CSS](https://tailwindcss.com)** - Utility-first CSS framework
+- **[Radix UI](https://www.radix-ui.com)** - Accessible component primitives
+- **[@elevenlabs/elevenlabs-js](https://www.npmjs.com/package/@elevenlabs/elevenlabs-js)** - Official ElevenLabs JavaScript SDK
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card
+    title="Follow the quickstart"
+    icon="circle-play"
+    href="/quickstart"
+  >
+    Learn how to transcribe your first audio file in under 5 minutes
+  </Card>
+  <Card
+    title="View installation guide"
+    icon="book-open"
+    href="/installation"
+  >
+    Complete setup instructions and verification steps
+  </Card>
+</CardGroup>

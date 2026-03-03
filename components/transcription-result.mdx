@@ -1,0 +1,328 @@
+---
+title: TranscriptionResult
+description: Component for displaying and interacting with transcription results
+---
+
+The `TranscriptionResult` component displays the transcription output with synchronized audio playback, speaker identification, and multiple export formats.
+
+## Component Props
+
+<ParamField path="result" type="TranscriptResult" required>
+  Transcription result containing transcript, audio URL, and alignment data
+</ParamField>
+
+<ParamField path="audioType" type="AudioType" required>
+  MIME type of the audio file (e.g., "audio/mpeg", "audio/wav")
+</ParamField>
+
+<ParamField path="speakerNames" type="SpeakerNames" required>
+  Record mapping speaker IDs to custom display names
+</ParamField>
+
+<ParamField path="onSpeakerNameChange" type="(speakerId: string, value: string) => void" required>
+  Callback fired when a speaker name is edited
+</ParamField>
+
+## TypeScript Interfaces
+
+```typescript
+type TranscriptionResultProps = {
+  result: TranscriptResult;
+  audioType: AudioType;
+  speakerNames: SpeakerNames;
+  onSpeakerNameChange: (speakerId: string, value: string) => void;
+};
+
+type TranscriptResult = {
+  transcript: SpeechToTextChunkResponseModel;
+  audioUrl: string;
+  alignment: CharacterAlignmentResponseModel;
+};
+
+type SpeakerNames = Record<string, string>;
+
+type AudioType =
+  | "audio/mpeg"
+  | "audio/wav"
+  | "audio/ogg"
+  | "audio/mp3"
+  | "audio/m4a"
+  | "audio/aac"
+  | "audio/webm";
+```
+
+## Usage Example
+
+```tsx
+import { useState } from "react";
+import { TranscriptionResult } from "@/features/speech-to-text-playground/transcription-result";
+import type { TranscriptResult, AudioType, SpeakerNames } from "@/features/speech-to-text-playground/speech-to-text-types";
+
+function ResultsPage() {
+  const [result, setResult] = useState<TranscriptResult | null>(null);
+  const [speakerNames, setSpeakerNames] = useState<SpeakerNames>({});
+
+  function handleSpeakerNameChange(speakerId: string, newName: string) {
+    setSpeakerNames((prev) => ({
+      ...prev,
+      [speakerId]: newName,
+    }));
+  }
+
+  if (!result) return null;
+
+  return (
+    <TranscriptionResult
+      result={result}
+      audioType="audio/mpeg"
+      speakerNames={speakerNames}
+      onSpeakerNameChange={handleSpeakerNameChange}
+    />
+  );
+}
+```
+
+## Features
+
+### 1. Language Detection Display
+
+Shows detected language and confidence level:
+
+```tsx
+<CardDescription>
+  Language: {result.transcript.languageCode} (
+  {(result.transcript.languageProbability * 100).toFixed(1)}% confidence)
+</CardDescription>
+```
+
+### 2. Speaker Name Customization
+
+Allows users to rename speakers for better readability:
+
+```tsx
+function SpeakerNameInput({ speakerId, value, onChange }: SpeakerNameInputProps) {
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    onChange(speakerId, event.target.value);
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Label className="text-xs text-muted-foreground min-w-[80px]">
+        {speakerId}:
+      </Label>
+      <Input
+        placeholder={speakerId}
+        value={value}
+        onChange={handleChange}
+        className="h-8 text-sm"
+      />
+    </div>
+  );
+}
+```
+
+### 3. Export Options
+
+Multiple copy formats via dropdown:
+
+```tsx
+<Select onValueChange={handleCopyOptionChange}>
+  <SelectContent>
+    <SelectItem value="plain">Plain Text</SelectItem>
+    <SelectItem value="md-full">Markdown (Full)</SelectItem>
+    <SelectItem value="md-no-time">Markdown (No Time)</SelectItem>
+    <SelectItem value="md-no-speaker">Markdown (No Speaker)</SelectItem>
+    <SelectItem value="md-clean">Markdown (Clean)</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+Export handlers:
+
+```tsx
+function handlePlainTextCopy() {
+  if (result.transcript.text) {
+    navigator.clipboard.writeText(result.transcript.text);
+  }
+}
+
+function handleMarkdownCopy(option: {
+  includeTimestamps: boolean;
+  includeSpeakers: boolean;
+}) {
+  const markdown = buildTranscriptMarkdown(result.transcript.words, {
+    includeTimestamps: option.includeTimestamps,
+    includeSpeakers: option.includeSpeakers,
+    getSpeakerName,
+  });
+  navigator.clipboard.writeText(markdown);
+}
+```
+
+### 4. Interactive Transcript Viewer
+
+Synchronized playback with word highlighting:
+
+```tsx
+<TranscriptViewerContainer
+  audioSrc={result.audioUrl}
+  audioType={audioType}
+  alignment={result.alignment}
+  className="space-y-4"
+>
+  <TranscriptViewerAudio className="sr-only" />
+
+  <div className="p-4 bg-muted/50 rounded-lg min-h-[100px]">
+    <TranscriptViewerWords renderWord={renderTranscriptWord} />
+  </div>
+
+  <TranscriptViewerScrubBar />
+
+  <TranscriptViewerPlayPauseButton size="lg" className="w-full">
+    {renderPlayPause}
+  </TranscriptViewerPlayPauseButton>
+</TranscriptViewerContainer>
+```
+
+### 5. Word Rendering with Speaker Labels
+
+Custom word renderer that shows speaker changes:
+
+```tsx
+function renderTranscriptWord({ word, status }: RenderWordPayload) {
+  const transcriptWords = result.transcript.words;
+  const originalWord = findTranscriptWordByTextAndStart(
+    transcriptWords,
+    word.text,
+    word.startTime
+  );
+  const speakerId = originalWord?.speakerId;
+  const previousWordSource = getTranscriptWordAtIndex(
+    transcriptWords,
+    word.wordIndex - 1
+  );
+  const previousWord = previousWordSource
+    ? findTranscriptWordByTextAndStart(
+        transcriptWords,
+        previousWordSource.text,
+        previousWordSource.start || 0
+      )
+    : undefined;
+  const prevSpeakerId = previousWord?.speakerId;
+  const speakerChanged = speakerId && speakerId !== prevSpeakerId;
+
+  return (
+    <>
+      {speakerChanged && (
+        <span className="inline-block text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded mr-1 align-middle">
+          {getSpeakerName(speakerId)}
+        </span>
+      )}
+      <span
+        className={
+          status === "spoken"
+            ? "text-muted-foreground"
+            : status === "current"
+            ? "text-primary font-semibold"
+            : "text-foreground"
+        }
+      >
+        {word.text}
+      </span>
+    </>
+  );
+}
+```
+
+## Word Status Types
+
+```typescript
+type TranscriptViewerWordStatus = "spoken" | "unspoken" | "current";
+```
+
+- **spoken**: Words that have already been spoken (muted text)
+- **current**: Currently playing word (highlighted in primary color)
+- **unspoken**: Words not yet reached (normal foreground color)
+
+## Utility Functions
+
+The component uses several utility functions from `transcript-utils.ts`:
+
+```typescript
+import {
+  buildTranscriptMarkdown,
+  findTranscriptWordByTextAndStart,
+  getTranscriptWordAtIndex,
+  getUniqueSpeakers,
+} from "./transcript-utils";
+```
+
+### getUniqueSpeakers
+
+Extracts all unique speaker IDs from transcript words:
+
+```tsx
+const uniqueSpeakers = useMemo(
+  () => getUniqueSpeakers(result.transcript.words),
+  [result.transcript.words]
+);
+```
+
+### buildTranscriptMarkdown
+
+Generates formatted markdown with optional timestamps and speakers:
+
+```typescript
+buildTranscriptMarkdown(words, {
+  includeTimestamps: true,
+  includeSpeakers: true,
+  getSpeakerName: (id) => speakerNames[id] || id,
+});
+```
+
+## Play/Pause Button Rendering
+
+```tsx
+function renderPlayPause({ isPlaying }: { isPlaying: boolean }) {
+  return isPlaying ? (
+    <>
+      <PauseIcon className="size-4 mr-2" /> Pause
+    </>
+  ) : (
+    <>
+      <PlayIcon className="size-4 mr-2" /> Play
+    </>
+  );
+}
+```
+
+## Dependencies
+
+```typescript
+import { useMemo, type ChangeEvent } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  TranscriptViewerAudio,
+  TranscriptViewerContainer,
+  TranscriptViewerPlayPauseButton,
+  TranscriptViewerScrubBar,
+  TranscriptViewerWords,
+} from "@/features/transcript-view/transcript-viewer";
+import { CopyIcon, PauseIcon, PlayIcon } from "lucide-react";
+import type { TranscriptWord as ViewerWord } from "@/features/transcript-view/transcript-types";
+import type { AudioType, SpeakerNames, TranscriptResult } from "./speech-to-text-types";
+import {
+  buildTranscriptMarkdown,
+  findTranscriptWordByTextAndStart,
+  getTranscriptWordAtIndex,
+  getUniqueSpeakers,
+} from "./transcript-utils";
+```
+
+## Source Location
+
+`/home/daytona/workspace/source/src/features/speech-to-text-playground/transcription-result.tsx`
