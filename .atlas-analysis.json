@@ -1,0 +1,109 @@
+{
+  "projectType": "saas",
+  "projectName": "ElevenLabs Speech-to-Text API UI",
+  "projectDescription": "A web-based playground for transcribing audio files using the ElevenLabs Scribe API with speaker diarization and real-time word highlighting",
+  "theme": "palm",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#6D28D9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/transcription",
+              "features/speaker-diarization",
+              "features/transcript-viewer",
+              "features/audio-playback"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/api-setup",
+              "configuration/transcription-options",
+              "configuration/advanced-settings"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/building",
+              "deployment/environment-variables",
+              "deployment/vercel"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "components/overview"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "components/speech-to-text-playground",
+              "components/transcription-form",
+              "components/transcription-result"
+            ]
+          },
+          {
+            "group": "Transcript View",
+            "pages": [
+              "components/transcript-viewer",
+              "components/transcript-hooks",
+              "components/word-alignment"
+            ]
+          },
+          {
+            "group": "UI Components",
+            "pages": [
+              "components/ui/scrub-bar",
+              "components/ui/form-controls"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Audio/video file transcription using ElevenLabs Scribe API",
+    "Speaker diarization with customizable speaker names",
+    "Real-time transcript viewer with word-level synchronization",
+    "Interactive audio playback with scrub bar control",
+    "Support for multiple audio formats (MP3, WAV, OGG, M4A, AAC, WebM)",
+    "Configurable transcription options (model selection, language, timestamps)",
+    "Multi-channel audio support",
+    "Audio event tagging and entity detection",
+    "Character and word-level timestamp granularity"
+  ],
+  "publicApiSurface": [
+    "SpeechToTextPlayground - Main playground component",
+    "TranscriptionForm - Form for configuring transcription options",
+    "TranscriptionResult - Component displaying transcription results",
+    "TranscriptViewerContainer - Container for transcript viewer",
+    "TranscriptViewerWords - Component rendering transcript words",
+    "TranscriptViewerAudio - Audio player component",
+    "TranscriptViewerPlayPauseButton - Play/pause control",
+    "TranscriptViewerScrubBar - Audio scrub bar control",
+    "useTranscriptViewer - Hook for transcript viewer state management",
+    "convertToAlignment - Utility for converting transcript to alignment format",
+    "getAudioTypeForFile - Utility for detecting audio file type"
+  ]
+}
